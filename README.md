@@ -3,12 +3,12 @@
 ## using pip (preferred)
 Make sure you have python 3.10 or more recent
 ```shell
-pip3 install git+https://github.com/promptops/cmd.git
+pip3 install git+https://github.com/promptops/cli.git
 ```
 
 ## using homebrew (MacOS only)
 ```shell
-brew install promptops/promptops/cmd
+brew install promptops/promptops/cli
 ```
 
 
