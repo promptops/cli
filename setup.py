@@ -3,15 +3,15 @@ import os
 
 
 def get_long_description():
+    # fmt: off
     """#PromptOps
 Your CLI assistant. Ask questions, get shell commands.
 """
+    # fmt: on
 
 
 def get_version():
-    path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "promptops", "version.py"
-    )
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "promptops", "version.py")
     g = {}
     with open(path) as fp:
         exec(fp.read(), g)
@@ -41,6 +41,8 @@ setup(
         "detect-secrets~=1.4.0",
         "prompt-toolkit~=3.0.38",
         "numpy~=1.24.3",
+        "boto3~=1.26.131",
+        "kubernetes~=26.1.0",
         "setuptools",
         "pip",
     ],
