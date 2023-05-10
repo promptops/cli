@@ -8,7 +8,7 @@ pip3 install git+https://github.com/promptops/cli.git
 
 ## using homebrew (MacOS only)
 ```shell
-brew install promptops/promptops/cli
+brew install promptops/promptops/promptops-cli
 ```
 
 
