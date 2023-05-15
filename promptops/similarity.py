@@ -1,5 +1,5 @@
+import logging
 import os.path
-
 import numpy as np
 import requests
 
@@ -73,13 +73,22 @@ class VectorDB(object):
 
 @lru_cache(maxsize=1_000)
 def embedding(text: str) -> np.ndarray:
-    resp = requests.post(settings.endpoint + "/embeddings", json={
-        "text": text,
-        "trace_id": trace.trace_id,
-    }, headers={
-        "user-agent": f"promptops-cli; user_id={user.user_id}",
-    })
+    resp = requests.post(
+        settings.endpoint + "/embeddings",
+        json={
+            "text": text,
+            "trace_id": trace.trace_id,
+        },
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
     resp.raise_for_status()
 
-    vector = resp.json()["embeddings"]
-    return np.array(vector)
+    data = resp.json()
+    try:
+        vector = data["embeddings"]
+        return np.array(vector)
+    except KeyError:
+        logging.debug("response: %s", data)
+        raise

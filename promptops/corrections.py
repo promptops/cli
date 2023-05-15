@@ -1,6 +1,7 @@
 import os.path
 from dataclasses import dataclass
 import logging
+from typing import Optional
 
 from promptops import settings
 from promptops.similarity import VectorDB
@@ -28,7 +29,7 @@ class QATuple:
         }
 
 
-_db: VectorDB = None
+_db: Optional[VectorDB] = None
 
 
 def get_db() -> VectorDB:
@@ -42,3 +43,4 @@ def get_db() -> VectorDB:
         logging.debug(f"loaded corrections db: {len(_db)} records")
 
     return _db
+

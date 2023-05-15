@@ -9,6 +9,6 @@ def feedback(payload: dict):
         "trace_id": trace.trace_id,
         **payload
     }, headers={
-        "user-agent": f"promptops-cli; user_id={user.user_id}"
+        "user-agent": f"promptops-cli; user_id={user.user_id()}"
     })
     # feedback is best-effort, so we don't raise for status

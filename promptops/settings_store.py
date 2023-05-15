@@ -48,6 +48,13 @@ def save():
         json.dump(data, f, indent=2)
 
 
+def set_history_context(history_context: int):
+    settings.history_context = history_context
+    save()
+    global _loaded_data
+    _loaded_data = settings
+
+
 def is_changed() -> bool:
     data = _build_data()
     return data != _loaded_data

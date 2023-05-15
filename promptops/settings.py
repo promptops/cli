@@ -1,4 +1,4 @@
-DEFAULT_ENDPOINT = "https://cli-development.promptops.com"
+DEFAULT_ENDPOINT = "https://cli.promptops.com"
 
 
 endpoint: str = DEFAULT_ENDPOINT
@@ -7,3 +7,4 @@ model: str = "accurate"
 history_context: int = 0
 corrections_db_path = "~/.promptops/corrections.db"
 history_db_path = "~/.promptops/history.db"
+user_id_path = "~/.promptops/user_id"

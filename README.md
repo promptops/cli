@@ -1,16 +1,18 @@
 # Installation
 
 ## using pip (preferred)
+
 Make sure you have python 3.10 or more recent
+
 ```shell
 pip3 install git+https://github.com/promptops/cli.git
 ```
 
 ## using homebrew (MacOS only)
+
 ```shell
 brew install promptops/promptops/promptops-cli
 ```
-
 
 # Usage
 
@@ -32,7 +34,6 @@ promptops runner
 um list contents of tar file
 um upload file to s3
 ```
-
 
 # Development setup
 
