@@ -36,11 +36,13 @@ setup(
     python_requires=">=3.7",
     install_requires=[
         "colorama~=0.4.6",
+        "urllib3>=1.26,<2",  # kubernetes uses google-auth which has urllib3<2
         "requests~=2.29.0",
         "websockets~=11.0.2",
         "detect-secrets~=1.4.0",
         "prompt-toolkit~=3.0.38",
         "numpy~=1.24.3",
+        "pyperclip~=1.8.2",
         "boto3~=1.26.131",
         "kubernetes~=26.1.0",
         "setuptools",

@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import random
+from typing import Optional
 
 import requests
 from prompt_toolkit import print_formatted_text
@@ -22,6 +23,7 @@ from promptops.cancellable import ThreadPoolExecutor
 from promptops.loading import Simple
 from promptops import similarity
 from promptops import corrections
+from promptops.corrections import get_correction
 from promptops.feedback import feedback
 from promptops import history
 from promptops import settings_store
@@ -42,10 +44,19 @@ def deduplicate(results: list[Result]):
     return final_results
 
 
-def run(cmd: Result) -> int:
+def run(cmd: Result) -> (int, Optional[str]):
     if cmd.lang == "shell":
-        proc = subprocess.run(cmd.script, shell=True, start_new_session=True)
-        return proc.returncode
+        proc = subprocess.run(
+            cmd.script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        if proc.stdout and str(proc.stdout) != "":
+            sys.stdout.write(proc.stdout.decode("utf-8"))
+        if proc.stderr and str(proc.stderr) != "":
+            sys.stdout.write(proc.stderr.decode("utf-8"))
+        sys.stdout.flush()
+
+        history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), proc.returncode)
+        return proc.returncode, str(proc.stderr)
     else:
         raise NotImplementedError(f"{cmd.lang} not implemented yet")
 
@@ -203,6 +214,46 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
             return ConfirmResult(result=selected, confirmed=confirmed)
 
 
+def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
+    selected = prompts.confirm(
+        f"looks like the command failed (return code was not 0), would you like us to attempt to fix it?"
+    )
+    if selected == prompts.GO_BACK:
+        return None
+    elif selected == prompts.EXIT:
+        raise KeyboardInterrupt()
+
+    tpe = ThreadPoolExecutor(max_workers=5)
+    ce_task = tpe.submit(get_correction, prompt=prompt, command=command, error=error)
+    try:
+        loading = Simple("thinking...")
+        loading.step()
+        while not ce_task.done():
+            time.sleep(0.1)
+            loading.step()
+        loading.clear()
+    finally:
+        tpe.shutdown()
+
+    result = ce_task.result()
+
+    results = [
+        Result(script=result, explanation=f"Revised previous command: {command}"),
+    ]
+    options = [pretty_result(r) for r in results]
+    ui = selections.UI(options, False, loading_text=random.choice(messages.QUERY))
+
+    index = ui.input()
+    selected = results[index]
+    if selected == prompts.GO_BACK:
+        return None
+    elif selected == prompts.EXIT:
+        raise KeyboardInterrupt()
+
+    print()
+    return selected
+
+
 def do_query(question: str):
     question = question.strip()
     if question == "":
@@ -261,8 +312,22 @@ def do_query(question: str):
     feedback({"event": "run"})
     revised_cmd = copy(cmd)
     revised_cmd.script = confirmed
-    rc = run(revised_cmd)
+    rc, stdout = run(revised_cmd)
     feedback({"event": "finished", "rc": rc})
+
+    while rc != 0:
+        corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stdout)
+        if not corrected_cmd:
+            return
+        rc, stdout = run(corrected_cmd)
+        if rc == 0:
+            db = corrections.get_db()
+            q = "\n".join(questions)
+            vector = similarity.embedding(text=q)
+            db.add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=corrected_cmd.script).to_dict())
+            logging.debug("added correction to db")
+            db.save(os.path.expanduser(settings.corrections_db_path))
+        feedback({"event": "finished", "rc": rc, "corrected": True})
 
 
 def query_mode(args):
@@ -296,8 +361,6 @@ def query(
     history_context: list[str],
     similar_history: list[str],
 ) -> list[Result]:
-    if len(prev_questions) > 0:
-        q = "\n".join([f"{i+1}. {text}" for i, text in enumerate(prev_questions + [q])])
     req = {
         "query": q,
         "prev_questions": prev_questions,
@@ -323,7 +386,10 @@ def query(
         },
     )
     if response.status_code != 200:
-        raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
+        # this exception completely destroys the ui
+        return []
+        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
+
     data = response.json()
     try:
         return [Result.from_dict(entry) for entry in data["suggestions"]]

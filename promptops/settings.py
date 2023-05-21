@@ -8,3 +8,4 @@ history_context: int = 0
 corrections_db_path = "~/.promptops/corrections.db"
 history_db_path = "~/.promptops/history.db"
 user_id_path = "~/.promptops/user_id"
+index_history: bool = False

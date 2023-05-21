@@ -4,9 +4,15 @@ websockets~=11.0.2
 detect-secrets~=1.4.0
 prompt-toolkit~=3.0.38
 numpy~=1.24.3
+pyperclip~=1.8.2
 
+# extras for the local runner
 boto3~=1.26.131
 kubernetes~=26.1.0
 
+# test dependencies
 pytest~=7.3.1
 pytest-asyncio~=0.21.0
+responses ~= 0.23.1
+pexpect
+pyte

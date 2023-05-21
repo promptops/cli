@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, REMAINDER
 import sys
 import os
+import traceback
 
 import logging
 
@@ -15,12 +16,41 @@ ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
 
 def runner_mode(args):
+    from feedback import feedback
+
+    feedback(
+        {
+            "event": "runner_mode",
+        }
+    )
+
     from local_runner.main import entry_point
 
     entry_point()
 
 
+def handle_exception(prev_handler):
+    def inner(exc_type, exc_value, exc_traceback):
+        sys.stderr.flush()
+        if prev_handler:
+            prev_handler(exc_type, exc_value, exc_traceback)
+        error_message = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        from promptops.feedback import feedback
+
+        feedback(
+            {
+                "event": "unhandled_exception",
+                "error": error_message,
+            }
+        )
+
+    return inner
+
+
 def entry_alias():
+    # Set the global exception handler
+    sys.excepthook = handle_exception(sys.excepthook)
+
     import colorama
 
     colorama.init()
@@ -76,13 +106,15 @@ def entry_alias():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    user.registration_check(args.config)
     version_check.version_check()
+    user.registration_check(args.config)
     query.query_mode(args)
 
 
 def entry_main():
+    # Set the global exception handler
+    sys.excepthook = handle_exception(sys.excepthook)
+
     import colorama
 
     colorama.init()
@@ -148,8 +180,8 @@ def entry_main():
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    user.registration_check()
     version_check.version_check()
+    user.registration_check()
     args.func(args)
 
 

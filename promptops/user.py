@@ -1,3 +1,4 @@
+import sys
 from typing import Optional
 
 from promptops import settings
@@ -9,6 +10,8 @@ from promptops.ui import selections
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 import requests
+from promptops.trace import trace_id
+from promptops.settings_store import save, set_index_history
 
 
 @lru_cache(maxsize=1)
@@ -38,9 +41,7 @@ def config_flow() -> Optional[dict]:
 
     print()
     print_formatted_text(
-        HTML(
-            "  👋 thanks for installing <ansigreen><b>um</b></ansigreen>!" " let's make sure you get the most out of it"
-        )
+        HTML("  👋 thanks for installing <ansigreen><b>um</b></ansigreen>! let's make sure you get the most out of it")
     )
     print()
 
@@ -67,6 +68,7 @@ def config_flow() -> Optional[dict]:
     if selection != 1:
         from promptops.history import index_history
 
+        set_index_history(True)
         index_history(show_progress=True)
         config_selections["loaded_history"] = True
 
@@ -115,7 +117,25 @@ def config_flow() -> Optional[dict]:
 
 def registration_check(force=False):
     if not force and has_registered():
+        from promptops.history import update_history
+
+        update_history()
         return
 
+    print()
+    print("  📢 provide your email address to receive occasional updates and tips (optional, leave blank to skip)")
+    email = confirm("").strip()
+    if email in [GO_BACK, EXIT]:
+        email = ""
+    print()
+
+    requests.post(
+        settings.endpoint + "/installed",
+        json={"trace-id": trace_id, "email": email, "platform": sys.platform, "python_version": sys.version},
+        headers={"user-agent": user_agent()},
+    )
     config = config_flow()
-    requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
+    config["trace-id"] = trace_id
+    if not force:
+        requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
+    save()
