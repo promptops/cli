@@ -167,6 +167,8 @@ class UI(object):
         if not self._is_active:
             return
         self._options = options
+        if self._selected >= len(self._options):
+            self._selected = len(self._options) - 1
         self._is_loading = is_loading
         self.render()
 

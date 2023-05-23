@@ -18,9 +18,10 @@ class Simple(LoadingBase):
         return colorama.Fore.GREEN + char + colorama.Style.RESET_ALL + " " + self._text
 
     def _draw(self):
-        self._stream.write(self._get_text() + " ")
+        txt = self._get_text() + " "
+        self._stream.write(txt)
         self._stream.flush()
-        self._written_lines = 1
+        self._written_lines = len(txt.split("\n"))
 
 
 def loader(text: str, style: str = THREE_DOTS, color=colorama.Fore.GREEN):

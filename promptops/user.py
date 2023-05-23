@@ -115,13 +115,7 @@ def config_flow() -> Optional[dict]:
     return config_selections
 
 
-def registration_check(force=False):
-    if not force and has_registered():
-        from promptops.history import update_history
-
-        update_history()
-        return
-
+def register():
     print()
     print("  📢 provide your email address to receive occasional updates and tips (optional, leave blank to skip)")
     email = confirm("").strip()
@@ -131,11 +125,10 @@ def registration_check(force=False):
 
     requests.post(
         settings.endpoint + "/installed",
-        json={"trace-id": trace_id, "email": email, "platform": sys.platform, "python_version": sys.version},
+        json={"trace_id": trace_id, "email": email, "platform": sys.platform, "python_version": sys.version},
         headers={"user-agent": user_agent()},
     )
     config = config_flow()
-    config["trace-id"] = trace_id
-    if not force:
-        requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
+    config["trace_id"] = trace_id
+    requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
     save()

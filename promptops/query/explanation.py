@@ -19,7 +19,7 @@ from . import messages
 from promptops import scrub_secrets
 
 
-def _get_explanation(
+def get_explanation(
     *,
     result: Result,
     prev_questions: list[str],
@@ -55,13 +55,13 @@ def _get_explanation(
 
 
 class ReturningThread(threading.Thread):
-    def __init__(self, target, args=..., kwargs=..., daemon=False):
+    def __init__(self, target, args=None, kwargs=None, daemon=False):
         super().__init__(target=self.run, daemon=daemon)
         self._return_value = None
         self._exception = None
         self.function = target
-        self.args = args
-        self.kwargs = kwargs
+        self.args = args or []
+        self.kwargs = kwargs or {}
 
     def run(self):
         try:
@@ -106,7 +106,7 @@ def explain(
     loading_thread.start()
 
     t = ReturningThread(
-        target=_get_explanation,
+        target=get_explanation,
         args=[],
         kwargs=dict(
             result=result,

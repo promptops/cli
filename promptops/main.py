@@ -10,7 +10,7 @@ from promptops import settings_store
 from promptops import version_check
 from promptops import query
 from promptops import user
-
+from promptops.recipes.creation import workflow_entrypoint
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
@@ -92,6 +92,7 @@ def entry_alias():
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
     parser.add_argument("question", nargs=REMAINDER, help="the question to ask")
+    registered = user.has_registered()
     args = parser.parse_args()
     if args.version:
         from promptops.version import __version__
@@ -107,7 +108,12 @@ def entry_alias():
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
     version_check.version_check()
-    user.registration_check(args.config)
+    if not registered or args.config:
+        user.register()
+    else:
+        from promptops import history
+
+        history.update_history()
     query.query_mode(args)
 
 
@@ -157,7 +163,14 @@ def entry_main():
     parser_runner = subparsers.add_parser("runner", help="run commands from slack")
     parser_runner.set_defaults(func=runner_mode)
 
+    parser_workflow = subparsers.add_parser("workflow", help="run a complex or multi-stepped script")
+    parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
+    parser_workflow.set_defaults(func=workflow_entrypoint)
+
     args = parser.parse_args()
+
+    registered = user.has_registered()
+
     if not hasattr(args, "func"):
         if args.version:
             from promptops.version import __version__
@@ -169,7 +182,7 @@ def entry_main():
                 print("latest version:", r.latest_version)
             sys.exit(0)
         if args.config:
-            user.registration_check(True)
+            user.register()
             sys.exit(0)
 
         parser.print_help()
@@ -181,7 +194,12 @@ def entry_main():
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     version_check.version_check()
-    user.registration_check()
+    if not registered:
+        user.register()
+    else:
+        from promptops import history
+
+        history.update_history()
     args.func(args)
 
 

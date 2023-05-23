@@ -23,12 +23,18 @@ class Zsh(Shell):
             if len(commands) >= look_back:
                 break
             if _is_zsh_start_line(line):
-                cmd = line.split(";")[1].rstrip() + buffer
+                line = line.split(";")[1].rstrip()
+                if line.endswith("\\"):
+                    line = line[:-1]
+                cmd = line + buffer
                 buffer = ""
                 if accept_command(cmd):
                     commands.append(cmd)
             else:
-                buffer = "\n" + line.rstrip() + buffer
+                line = line.rstrip()
+                if line.endswith("\\"):
+                    line = line[:-1]
+                buffer = "\n" + line + buffer
         return scrub_lines(fname, list(reversed(commands)))
 
     def _get_cmds_from_lines(self, lines):
@@ -41,6 +47,8 @@ class Zsh(Shell):
                 buffer = line.split(";")[1].rstrip()
             else:
                 buffer += "\n" + line.rstrip()
+            if buffer.endswith("\\"):
+                buffer = buffer[:-1]
         if buffer != "" and not buffer.endswith("\\"):
             commands.append(buffer)
         return commands

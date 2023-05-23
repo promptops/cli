@@ -69,8 +69,7 @@ class FileCompleter(Completer):
                     )
 
 
-def confirm_command(prompt_text, show_go_back=True):
-    message = f"> "
+def confirm_command(prompt_text, show_go_back=True, message="> "):
     bottom_toolbar = HTML(
         "<b>[enter]</b> confirm <b>[ctrl+c]</b> exit"
         + (" <b>[esc]</b> or <b>[ctrl+b]</b> go back" if show_go_back else "")

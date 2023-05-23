@@ -1,11 +1,25 @@
 import colorama
 
+from .base import LoadingBase
+
 
 _chars = "⬢⬡"
 
 alternating = "⬢⬡"
 filled = "⬢"
 outline = "⬡"
+
+
+class PromptOps(LoadingBase):
+    def __init__(self, text: str):
+        super().__init__()
+        self._loader = loader(text)
+
+    def _draw(self):
+        txt = self._loader() + " "
+        self._stream.write(txt)
+        self._stream.flush()
+        self._written_lines = len(txt.split("\n"))
 
 
 def loader(text: str, style: str = alternating, colors: list[str] = None):

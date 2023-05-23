@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from copy import copy
 import subprocess
 import threading
-import time
 import random
 from typing import Optional
 
 import requests
 from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.formatted_text import HTML, to_formatted_text
 import prompt_toolkit
 
 from promptops import settings
@@ -20,7 +20,7 @@ from promptops import user
 from promptops.ui import prompts
 from promptops.ui import selections
 from promptops.cancellable import ThreadPoolExecutor
-from promptops.loading import Simple
+from promptops.loading import Simple, loading_animation
 from promptops import similarity
 from promptops import corrections
 from promptops.corrections import get_correction
@@ -29,7 +29,7 @@ from promptops import history
 from promptops import settings_store
 from promptops import scrub_secrets
 from .dtos import Result
-from .explanation import explain
+from .explanation import get_explanation, ReturningThread
 from . import messages
 
 
@@ -88,18 +88,9 @@ class ConfirmResult:
 
 def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmResult:
     embedding = similarity.embedding(text="\n".join(questions))
-    tpe = ThreadPoolExecutor(max_workers=5)
-    cs_task = tpe.submit(corrections_search, embedding)
-    hs_task = tpe.submit(history.check_history, embedding)
-    try:
-        loading = Simple("thinking...")
-        loading.step()
-        while not all([cs_task.done(), hs_task.done()]):
-            time.sleep(0.1)
-            loading.step()
-        loading.clear()
-    finally:
-        tpe.shutdown()
+    with loading_animation(Simple("thinking...")), ThreadPoolExecutor(max_workers=5) as tpe:
+        cs_task = tpe.submit(corrections_search, embedding)
+        hs_task = tpe.submit(history.check_history, embedding)
 
     update_lock = threading.Lock()
     corrected_results = []
@@ -110,6 +101,10 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
             logging.debug(f"- {score:.2f}: {qa.question} -> {qa.corrected}")
             corrected_results.append(Result(script=qa.corrected, origin="history"))
     history_results = hs_task.result()
+    logging.debug("found %d similar history results", len(history_results))
+    if len(history_results) > 0:
+        for r, score in history_results:
+            logging.debug(f"- {score:.2f}: {r}")
     history_results = [
         Result(script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history", origin="history")
         for r, _ in history_results
@@ -154,15 +149,9 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
         task.add_done_callback(tpe.cancellable_callback(done_callback))
 
     if len(results) == 0:
-        try:
-            loading = Simple("thinking...")
-            loading.step()
-            while not all([t.done() for t in tasks]):
-                time.sleep(0.1)
-                loading.step()
-            loading.clear()
-        finally:
-            tpe.shutdown()
+        with loading_animation(Simple("thinking...")):
+            tpe.shutdown(wait=True)
+        num_running = 0
         results = [r for t in tasks for r in t.result()]
         results = deduplicate(results)
         if len(results) == 0:
@@ -173,12 +162,37 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
                 raise KeyboardInterrupt()
             return ConfirmResult(question=selected, options=[])
 
+    def remove_entry(_, ui: selections.UI):
+        with update_lock:
+            if ui.selected >= len(results):
+                return
+            result = results[ui.selected]
+            if result.origin == "history":
+                results.pop(ui.selected)
+                options = [pretty_result(r) for r in results]
+                if num_running == 0:
+                    options += [make_revise_option()]
+                ui.reset_options(options, is_loading=num_running > 0)
+        hdb = history.get_history_db()
+        for item in hdb.objects:
+            if isinstance(item, dict) and item["cmd"] == result.script:
+                item["ignore"] = True
+        hdb.save(os.path.expanduser(settings.history_db_path))
+
     while True:
         with update_lock:
             options = [pretty_result(r) for r in results]
             if num_running == 0:
                 options += [make_revise_option()]
-            ui = selections.UI(options, num_running > 0, loading_text=random.choice(messages.QUERY))
+            ui = selections.UI(
+                options,
+                num_running > 0,
+                loading_text=random.choice(messages.QUERY),
+                actions={
+                    "\x08": remove_entry,
+                    "\x7F": remove_entry,
+                },
+            )
         index = ui.input()
         print()
         if index == len(results):
@@ -193,20 +207,65 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
             if selected.explanation:
                 print_formatted_text(HTML(selected.explanation))
                 print()
+                confirmed = prompts.confirm_command(selected.script, False)
             elif selected.origin == "promptops" and settings.request_explanation:
-                try:
-                    explain(
-                        result=selected,
-                        prev_questions=questions[:-1],
-                        prev_results=prev_results,
-                        corrected_results=[qa for qa, _ in similar_corrections],
-                        similar_history=[r.script for r in history_results],
-                        history_context=[],
-                    )
-                except KeyboardInterrupt:
-                    pass
 
-            confirmed = prompts.confirm_command(selected.script, False)
+                done_loading = threading.Event()
+
+                def _explain_and_done(*args, **kwargs):
+                    try:
+                        return get_explanation(*args, **kwargs)
+                    finally:
+                        done_loading.set()
+
+                def _confirm_and_done(*args, **kwargs):
+                    try:
+                        return prompts.confirm_command(*args, **kwargs)
+                    finally:
+                        done_loading.set()
+
+                with patch_stdout(raw=True):
+                    et = ReturningThread(
+                        target=_explain_and_done,
+                        kwargs=dict(
+                            result=selected,
+                            prev_questions=questions[:-1],
+                            prev_results=prev_results,
+                            corrected_results=[qa for qa, _ in similar_corrections],
+                            similar_history=[r.script for r in history_results],
+                            history_context=[],
+                        ),
+                        daemon=True,
+                    )
+                    pt = ReturningThread(
+                        target=_confirm_and_done,
+                        args=(selected.script, False),
+                        kwargs=dict(
+                            message="\n> ",
+                        ),
+                    )
+                    msg = random.choice(messages.EXPLAIN)
+                    sys.stdout.sleep_between_writes = 0.2
+                    with loading_animation(Simple(msg), fps=5):
+                        et.start()
+                        pt.start()
+                        done_loading.wait()
+                    sys.stdout.sleep_between_writes = 0.5
+                    if not et.is_alive():
+                        try:
+                            explanation = et.join()
+                            indented = "\n".join(" │  " + line for line in explanation.splitlines())
+                            print_formatted_text(to_formatted_text(HTML(indented), style="fg: ansiyellow"))
+                            print()
+                        except requests.HTTPError as e:
+                            print_formatted_text(
+                                HTML(f"<ansired> │  oh snap, failed to fetch you the explanation: {e}</ansired>")
+                            )
+                            print()
+                    confirmed = pt.join()
+            else:
+                confirmed = prompts.confirm_command(selected.script, False)
+
             if confirmed == prompts.GO_BACK:
                 continue
             elif confirmed == prompts.EXIT:
@@ -223,17 +282,8 @@ def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
     elif selected == prompts.EXIT:
         raise KeyboardInterrupt()
 
-    tpe = ThreadPoolExecutor(max_workers=5)
-    ce_task = tpe.submit(get_correction, prompt=prompt, command=command, error=error)
-    try:
-        loading = Simple("thinking...")
-        loading.step()
-        while not ce_task.done():
-            time.sleep(0.1)
-            loading.step()
-        loading.clear()
-    finally:
-        tpe.shutdown()
+    with loading_animation(Simple("thinking...")), ThreadPoolExecutor(max_workers=5) as tpe:
+        ce_task = tpe.submit(get_correction, prompt=prompt, command=command, error=error)
 
     result = ce_task.result()
 

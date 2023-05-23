@@ -33,7 +33,8 @@ def get_history_db() -> VectorDB:
 
 def check_history(embedding):
     history_db = get_history_db()
-    results = history_db.search(embedding)
+    results = history_db.search(embedding, k=3, min_similarity=0.8)
+    results = [(obj, score) for obj, score in results if not isinstance(obj, dict) or not obj.get("ignore", False)]
     return results
 
 
