@@ -88,19 +88,17 @@ class ConfirmResult:
 
 def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmResult:
     embedding = similarity.embedding(text="\n".join(questions))
-    with loading_animation(Simple("thinking...")), ThreadPoolExecutor(max_workers=5) as tpe:
-        cs_task = tpe.submit(corrections_search, embedding)
-        hs_task = tpe.submit(history.check_history, embedding)
-
     update_lock = threading.Lock()
     corrected_results = []
-    similar_corrections = cs_task.result()
+
+    similar_corrections = corrections_search(embedding)
     logging.debug("found %d similar corrections", len(similar_corrections))
     if len(similar_corrections) > 0:
         for qa, score in similar_corrections:
             logging.debug(f"- {score:.2f}: {qa.question} -> {qa.corrected}")
             corrected_results.append(Result(script=qa.corrected, origin="history"))
-    history_results = hs_task.result()
+
+    history_results = history.check_history(embedding)
     logging.debug("found %d similar history results", len(history_results))
     if len(history_results) > 0:
         for r, score in history_results:
