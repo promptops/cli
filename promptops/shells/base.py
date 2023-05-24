@@ -84,8 +84,13 @@ class Shell:
 
     def _read_history_file(self):
         fname = os.path.expanduser(self.history_file)
-        with open(fname, "r") as f:
-            return [line.strip() for line in f if line.strip() != ""]
+        try:
+            with open(fname, "r", encoding="utf-8") as f:
+                return [line.strip() for line in f if line.strip() != ""]
+        except UnicodeDecodeError:
+            # attempt to use platform default encoding
+            with open(fname, "r") as f:
+                return [line.strip() for line in f if line.strip() != ""]
 
     def _get_cmds_from_lines(self, history):
         raise NotImplementedError()
