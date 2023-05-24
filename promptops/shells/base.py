@@ -92,3 +92,17 @@ class Shell:
 
     def get_recent_history(self, look_back: int = 10):
         raise NotImplementedError()
+
+
+class NoopShell(Shell):
+    def _get_cmds_from_lines(self, history):
+        pass
+
+    def __init__(self):
+        super().__init__(None)
+
+    def get_full_history(self):
+        return []
+
+    def get_recent_history(self, look_back: int = 10):
+        return []
