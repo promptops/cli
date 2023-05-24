@@ -1,3 +1,4 @@
+from pathlib import Path
 from setuptools import setup, find_packages
 import os
 
@@ -22,7 +23,7 @@ setup(
     name="promptops",
     version=get_version(),
     description="Your CLI assistant. Ask questions, get shell commands.",
-    long_description=get_long_description(),
+    long_description=(Path(__file__).parent / "README.md").read_text(),
     long_description_content_type="text/markdown",
     author="CtrlStack inc.",
     url="https://promptops.com/",
@@ -31,9 +32,10 @@ setup(
         "Changelog": "https://docs.promptops.com/en/stable/changelog.html",
         "Live demo": "https://promptops.com/",
     },
+    license='GPLv3',
     packages=find_packages(exclude=("tests", "tests.*")),
     include_package_data=False,
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     install_requires=[
         "colorama~=0.4.6",
         "urllib3>=1.26,<2",  # kubernetes uses google-auth which has urllib3<2
@@ -59,7 +61,8 @@ setup(
     extras_require={},
     tests_require=[],
     classifiers=[
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Intended Audience :: Developers",
-        "Intended Audience :: SRE",
+        "Intended Audience :: System Administrators",
     ],
 )

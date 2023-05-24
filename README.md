@@ -1,6 +1,6 @@
 `um` is a GPT-powered CLI assistant. Ask questions in plain English, get the perfect shell command.
 
-<img src="media/default.png" />
+<img src="https://github.com/promptops/cli/raw/main/media/default.png" />
 
 # Features
 
@@ -14,10 +14,10 @@
 
 ## pip (preferred)
 
-Make sure you have python 3.10 or more recent
+Make sure you have python 3.9 or more recent
 
 ```shell
-pip3 install git+https://github.com/promptops/cli.git
+pip3 install promptops
 ```
 
 ## homebrew (MacOS only)
@@ -51,11 +51,11 @@ um upload file to s3
 
 Semantic search in history
 
-<img src="media/semantic-search.png" />
+<img src="https://github.com/promptops/cli/raw/main/media/semantic-search.png" />
 
 Provide more context flow
 
-<img src="media/clarify.png" />
+<img src="https://github.com/promptops/cli/raw/main/media/clarify.png" />
 
 # Development setup
 

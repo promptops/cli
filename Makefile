@@ -5,3 +5,12 @@ build:
 
 install:
 	python setup.py install
+
+clean:
+	rm dist/*
+
+package: clean
+	python -m build .
+
+publish: package
+	python -m twine upload dist/*
