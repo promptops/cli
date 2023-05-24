@@ -43,6 +43,7 @@ setup(
         "prompt-toolkit~=3.0.38",
         "numpy~=1.24.3",
         "pyperclip~=1.8.2",
+        "psutil~=5.9.5",
         "boto3~=1.26.131",
         "kubernetes~=26.1.0",
         "setuptools",
