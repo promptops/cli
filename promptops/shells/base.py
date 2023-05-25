@@ -27,7 +27,7 @@ def filter_commands(commands: list[str]):
     return filter(accept_command, commands)
 
 
-def reverse_readline(filename, buf_size=8192):
+def reverse_readline(filename, buf_size=8192, transform: callable = None):
     """A generator that returns the lines of a file in reverse order"""
     with open(filename, "rb") as fh:
         segment = None
@@ -38,18 +38,23 @@ def reverse_readline(filename, buf_size=8192):
         while remaining_size > 0:
             offset = min(file_size, offset + buf_size)
             fh.seek(file_size - offset)
-            # TODO: this could fail if things don't align for unicode characters
             block = fh.read(min(remaining_size, buf_size)) + extra
             remaining_size -= buf_size
+
+            if transform is not None:
+                block, extra_transform = transform(block)
+            else:
+                extra_transform = b""
+
             for i in range(min(8, len(block))):
                 try:
                     buffer = block[i:].decode(encoding="utf-8")
-                    extra = block[:i]
+                    extra = block[:i] + extra_transform
                     break
                 except UnicodeDecodeError:
                     continue
             else:
-                extra = block
+                extra = block + extra_transform
                 continue
             lines = buffer.split("\n")
             # The first line of the buffer is probably not a complete line so
@@ -66,8 +71,44 @@ def reverse_readline(filename, buf_size=8192):
             segment = lines[0]
             # iterate in reverse
             for index in range(len(lines) - 1, 0, -1):
-                if lines[index]:
-                    yield lines[index]
+                yield lines[index]
+        # Don't yield None if the file was empty
+        if segment is not None:
+            yield segment
+
+
+def readline(filename, buf_size=8192, transform: callable = None):
+    with open(filename, "rb") as fh:
+        segment = None
+        extra = b""
+        while True:
+            data = fh.read(buf_size)
+            if not data:
+                break
+            block = extra + data
+            if transform is not None:
+                block, extra_transform = transform(block)
+            else:
+                extra_transform = b""
+            for i in range(min(8, len(block))):
+                try:
+                    buffer = block[i:].decode(encoding="utf-8")
+                    extra = block[:i] + extra_transform
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                extra = block + extra_transform
+                continue
+            lines = buffer.split("\n")
+            # The last line of the buffer is probably not a complete line so
+            # we'll save it and append it to the first line of the next buffer
+            # we read
+            if segment is not None:
+                lines[0] = segment + lines[0]
+            for line in lines[:-1]:
+                yield line
+            segment = lines[-1]
         # Don't yield None if the file was empty
         if segment is not None:
             yield segment
