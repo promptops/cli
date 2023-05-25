@@ -6,14 +6,14 @@ def main():
     print(f"shell: {shell.__class__.__name__}")
 
     print("---recent---")
-    recent = shell.get_recent_history()
+    recent = shell.get_recent_history(look_back=100)
     for cmd in recent:
-        print(cmd)
+        print("$", cmd)
 
     print("---full---")
     full = shell.get_full_history()
     for cmd in full[-10:]:
-        print(cmd)
+        print("$", cmd)
 
 
 if __name__ == "__main__":

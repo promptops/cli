@@ -2,10 +2,11 @@ import tempfile
 from promptops.shells.zsh import Zsh
 
 
-contents = """
+contents = b"""
 : 1683929171:0;export SECRET_KEY="aKbyRLXXXXXXXXXXXXXXXXXXXXXXXXXXIzYwm/lX"
 : 1683929174:0;echo $SECRET_KEY
 : 1683929187:0;cat single line > test.txt
+: 1683929190:0;echo \xF0\x83\xBF\x83\xB8\x83\xA3
 : 1683929206:0;echo very \\\\
 long \\\\
 line
@@ -21,6 +22,7 @@ expected = [
     'export SECRET_KEY="<SECRET>"',
     "echo $SECRET_KEY",
     "cat single line > test.txt",
+    'echo 😃',
     "echo very \\\nlong \\\nline",
     "echo 'very \nlong \nline'",
     # for some reason the JWT plugin fails to grab the full token, but that should be enough
@@ -31,7 +33,7 @@ expected = [
 
 def test_zsh():
     with tempfile.NamedTemporaryFile() as tmp:
-        with open(tmp.name, "w") as f:
+        with open(tmp.name, "wb") as f:
             f.write(contents)
 
         shell = Zsh(tmp.name)

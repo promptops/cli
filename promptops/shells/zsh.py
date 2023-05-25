@@ -1,12 +1,30 @@
 import re
 
-from promptops.shells.base import Shell, accept_command, reverse_readline
+from promptops.shells.base import Shell, accept_command, reverse_readline, readline
 from promptops.scrub_secrets import scrub_lines
 import os
 
 
 def _is_zsh_start_line(line):
     return re.match(r"^: \d+:\d+;.+", line) is not None
+
+
+_meta_char = 0x83
+
+
+def unmetafy(cmd: bytes) -> (bytes, bytes):
+    i = 0
+    result = b""
+    while i < len(cmd):
+        if cmd[i] == _meta_char:
+            if i + 1 >= len(cmd):
+                return result, cmd[i:]
+            result += bytes([cmd[i+1] ^ 32])
+            i += 1
+        else:
+            result += cmd[i: i+1]
+        i += 1
+    return result, b""
 
 
 class Zsh(Shell):
@@ -19,7 +37,11 @@ class Zsh(Shell):
         fname = os.path.expanduser(self.history_file)
         buffer = ""
         commands = []
-        for line in reverse_readline(fname):
+        starting = True
+        for line in reverse_readline(fname, transform=unmetafy):
+            if starting and line == "":
+                continue
+            starting = False
             if len(commands) >= look_back:
                 break
             if _is_zsh_start_line(line):
@@ -37,10 +59,21 @@ class Zsh(Shell):
                 buffer = "\n" + line + buffer
         return scrub_lines(fname, list(reversed(commands)))
 
+    def get_full_history(self):
+        fname = os.path.expanduser(self.history_file)
+        lines = list(readline(fname, transform=unmetafy))
+        commands = filter(accept_command, self._get_cmds_from_lines(lines))
+        return scrub_lines(fname, list(commands))
+
     def _get_cmds_from_lines(self, lines):
         buffer = ""
         commands = []
-        for line in lines:
+        # find the index of the last non-empty line
+        i = len(lines) - 1
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i] != "":
+                break
+        for line in lines[:i+1]:
             if _is_zsh_start_line(line):
                 if buffer != "":
                     commands.append(buffer)
