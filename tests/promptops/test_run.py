@@ -1,6 +1,5 @@
 from promptops.query.query import run
 from promptops.query.dtos import Result
-import subprocess
 
 
 def test_run():
