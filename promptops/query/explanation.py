@@ -59,18 +59,33 @@ class ReturningThread(threading.Thread):
         super().__init__(target=self.run, daemon=daemon)
         self._return_value = None
         self._exception = None
+        self._finished = False
         self.function = target
         self.args = args or []
         self.kwargs = kwargs or {}
+        self._done_callbacks = []
 
     def run(self):
         try:
             self._return_value = self.function(*self.args, **self.kwargs)
         except Exception as e:
             self._exception = e
+        self._finished = True
+        for fn in self._done_callbacks:
+            fn(self)
 
     def join(self, timeout=None) -> any:
         super().join(timeout)
+        if self._exception is not None:
+            raise self._exception
+        return self._return_value
+
+    def add_done_callback(self, fn):
+        self._done_callbacks.append(fn)
+
+    def result(self):
+        if not self._finished:
+            raise RuntimeError("not finished")
         if self._exception is not None:
             raise self._exception
         return self._return_value

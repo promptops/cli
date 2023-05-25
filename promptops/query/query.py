@@ -19,7 +19,6 @@ from promptops import trace
 from promptops import user
 from promptops.ui import prompts
 from promptops.ui import selections
-from promptops.cancellable import ThreadPoolExecutor
 from promptops.loading import Simple, loading_animation
 from promptops import similarity
 from promptops import corrections
@@ -49,14 +48,14 @@ def run(cmd: Result) -> (int, Optional[str]):
         proc = subprocess.run(
             cmd.script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        if proc.stdout and str(proc.stdout) != "":
+        if proc.stdout and len(proc.stdout) > 0:
             sys.stdout.write(proc.stdout.decode("utf-8"))
-        if proc.stderr and str(proc.stderr) != "":
+        if proc.stderr and len(proc.stderr) > 0:
             sys.stdout.write(proc.stderr.decode("utf-8"))
         sys.stdout.flush()
 
         history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), proc.returncode)
-        return proc.returncode, str(proc.stderr)
+        return proc.returncode, proc.stderr.decode("utf-8")
     else:
         raise NotImplementedError(f"{cmd.lang} not implemented yet")
 
@@ -111,17 +110,19 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
     results = corrected_results + history_results
     results = deduplicate(results)
 
-    tpe = ThreadPoolExecutor(max_workers=2)
     ui = None
     tasks = [
-        tpe.submit(
+        ReturningThread(
             query,
-            q=questions[-1],
-            prev_questions=questions[:-1],
-            corrected_results=[qa for qa, _ in similar_corrections],
-            prev_results=prev_results,
-            similar_history=[r.script for r in history_results],
-            history_context=[],
+            kwargs=dict(
+                q=questions[-1],
+                prev_questions=questions[:-1],
+                corrected_results=[qa for qa, _ in similar_corrections],
+                prev_results=prev_results,
+                similar_history=[r.script for r in history_results],
+                history_context=[],
+            ),
+            daemon=True,
         )
     ]
     num_running = len(tasks)
@@ -138,19 +139,20 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
                     options += [make_revise_option()]
                 ui.reset_options(options, is_loading=num_running > 0)
 
-    def done_callback(future):
-        if future.exception():
-            print(future.exception())
-        update_results(future.result())
+    def done_callback(thread: ReturningThread):
+        try:
+            update_results(thread.result())
+        except Exception as exc:
+            logging.exception(exc)
 
     for task in tasks:
-        task.add_done_callback(tpe.cancellable_callback(done_callback))
+        task.add_done_callback(done_callback)
+        task.start()
 
     if len(results) == 0:
         with loading_animation(Simple("thinking...")):
-            tpe.shutdown(wait=True)
+            results = [r for t in tasks for r in t.join()]
         num_running = 0
-        results = [r for t in tasks for r in t.result()]
         results = deduplicate(results)
         if len(results) == 0:
             feedback({"event": "no-results"})
@@ -280,10 +282,10 @@ def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
     elif selected == prompts.EXIT:
         raise KeyboardInterrupt()
 
-    with loading_animation(Simple("thinking...")), ThreadPoolExecutor(max_workers=5) as tpe:
-        ce_task = tpe.submit(get_correction, prompt=prompt, command=command, error=error)
-
-    result = ce_task.result()
+    with loading_animation(Simple("thinking...")):
+        ce_task = ReturningThread(target=get_correction, kwargs=dict(prompt=prompt, command=command, error=error), daemon=True)
+        ce_task.start()
+        result = ce_task.join()
 
     results = [
         Result(script=result, explanation=f"Revised previous command: {command}"),
