@@ -33,7 +33,7 @@ ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
 
 def runner_mode(args):
-    from feedback import feedback
+    from promptops.feedback import feedback
 
     feedback(
         {
