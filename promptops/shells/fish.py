@@ -2,6 +2,7 @@ from .base import Shell
 from .base import reverse_readline, accept_command
 from promptops.scrub_secrets import scrub_lines
 import os
+import logging
 
 
 def _is_start_line(line):
@@ -23,9 +24,12 @@ class Fish(Shell):
             if _is_start_line(line):
                 cmd = line.split("- cmd: ")[1].rstrip()
                 # unescape see https://stackoverflow.com/a/57192592
-                cmd = cmd.encode("latin-1", "backslashreplace").decode("unicode-escape")
-                if accept_command(cmd):
-                    commands.append(cmd)
+                try:
+                    cmd = cmd.encode("latin-1", "backslashreplace").decode("unicode-escape")
+                    if accept_command(cmd):
+                        commands.append(cmd)
+                except UnicodeDecodeError:
+                    logging.debug("UnicodeDecodeError at line: ", line)
         return commands
 
     def get_recent_history(self, look_back: int = 10):
@@ -37,7 +41,10 @@ class Fish(Shell):
             if _is_start_line(line):
                 cmd = line.split("- cmd: ")[1].rstrip()
                 # unescape see https://stackoverflow.com/a/57192592
-                cmd = cmd.encode("latin-1", "backslashreplace").decode("unicode-escape")
-                if accept_command(cmd):
-                    commands.append(cmd)
+                try:
+                    cmd = cmd.encode("latin-1", "backslashreplace").decode("unicode-escape")
+                    if accept_command(cmd):
+                        commands.append(cmd)
+                except UnicodeDecodeError:
+                    logging.debug("UnicodeDecodeError at line: ", line)
         return scrub_lines(fname, list(reversed(commands)))
