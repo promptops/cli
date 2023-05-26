@@ -67,6 +67,7 @@ def reverse_readline(filename, buf_size=8192, transform: callable = None):
                 if buffer[-1] != "\n":
                     lines[-1] += segment
                 else:
+                    lines = lines[:-1]
                     yield segment
             segment = lines[0]
             # iterate in reverse
