@@ -16,6 +16,8 @@ class TerraformExecutor:
         print(obj)
         self.steps = [Step(i.get('file'), i.get('content')) for i in obj.get('steps')]
         self.parameters = obj.get('parameters')
+        directory = directory.strip()
+        directory = directory if directory[0] != "/" else directory[1:]
         self.directory = os.path.expanduser(directory)
 
     def run(self):
@@ -24,6 +26,31 @@ class TerraformExecutor:
         print("working in director: ", self.directory)
         self.resolve_unfilled_parameters()
         self.execute()
+
+        print()
+        print(f"please verify that the terraform files in directory {self.directory} are correct")
+        print()
+
+        options = ["exit", "re-generate files", "terraform init"]
+
+        while True:
+            ui = selections.UI(options, is_loading=False)
+            selection = ui.input()
+
+            if selection == 0:
+                break
+            elif selection == 1:
+                self.fix()
+                print("Coming soon. Please try a different option.")
+            elif selection == 2:
+                self.init()
+                options.extend(["terraform plan", "terraform apply"])
+            elif selection == 3:
+                self.plan()
+            elif selection == 4:
+                self.apply()
+                break
+            print()
 
     def resolve_unfilled_parameters(self):
         for parameter in self.parameters:
@@ -74,37 +101,19 @@ class TerraformExecutor:
         subprocess.run(f"ls {self.directory}", shell=True, start_new_session=True,)
         subprocess.run("terraform init", shell=True, start_new_session=True, cwd=self.directory)
 
-    def plan(self):
-        subprocess.run("terraform plan", shell=True, start_new_session=True, cwd=self.directory)
+    def plan(self) -> bool:
+        return subprocess.run("terraform plan", shell=True, start_new_session=True, cwd=self.directory).returncode == 0
 
-    def apply(self):
-        subprocess.run("terraform apply", shell=True, start_new_session=True, cwd=self.directory)
+    def apply(self) -> bool:
+        return subprocess.run("terraform apply", shell=True, start_new_session=True, cwd=self.directory).returncode == 0
 
     def fix(self):
-        print("attempting to fix terraform files in " + self.directory)
+        # print("attempting to fix terraform files in " + self.directory)
+        return
 
 
 if __name__ == "__main__":
-    obj = {'type': 'terraform', 'steps': [{
-                                        'content': 'variable "aws_region" {\n  type    = string\n  default = "us-west-2"\n}\n\nprovider "aws" {\n  region = var.aws_region\n}\n',
-                                        'file': 'provider.tf'}, {
-                                        'content': 'resource "aws_iam_role" "lambda_role" {\n  name = "my_lambda_role"\n\n  assume_role_policy = jsonencode({\n    Version = "2012-10-17"\n    Statement = [\n      {\n        Action = "sts:AssumeRole"\n        Effect = "Allow"\n        Principal = {\n          Service = "lambda.amazonaws.com"\n        }\n      }\n    ]\n  })\n}\n',
-                                        'file': 'iam_role.tf'}, {
-                                        'content': 'resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {\n  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"\n  role       = aws_iam_role.lambda_role.name\n}\n',
-                                        'file': 'iam_role_policy.tf'}, {
-                                        'content': 'variable "function_name" {\n  type = string\n}\n\nvariable "runtime" {\n  type = string\n}\n\nvariable "handler" {\n  type = string\n}\n\nvariable "filename" {\n  type = string\n}\n',
-                                        'file': 'variables.tf'}, {
-                                        'content': 'resource "aws_lambda_function" "example" {\n  function_name = var.function_name\n  filename      = var.filename\n  runtime       = var.runtime\n  handler       = var.handler\n  role          = aws_iam_role.lambda_role.arn\n\n  source_code_hash = filebase64sha256(var.filename)\n\n  environment {\n    variables = {\n      EXAMPLE_VAR = "example_value"\n    }\n  }\n}\n',
-                                        'file': 'lambda_function.tf'}, {
-                                        'content': 'resource "aws_apigatewayv2_api" "api_gateway" {\n  name          = "example_api_gateway"\n  protocol_type = "HTTP"\n}\n\nresource "aws_apigatewayv2_integration" "lambda_integration" {\n  api_id              = aws_apigatewayv2_api.api_gateway.id\n  integration_type    = "AWS_PROXY"\n  integration_uri     = aws_lambda_function.example.invoke_arn\n  payload_format_version = "2.0"\n\n  connection_type = "INTERNET"\n}\n\nresource "aws_apigatewayv2_route" "example_route" {\n  api_id    = aws_apigatewayv2_api.api_gateway.id\n  route_key = "ANY /{proxy+}"\n  target     = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"\n}\n\nresource "aws_apigatewayv2_stage" "example_stage" {\n  api_id     = aws_apigatewayv2_api.api_gateway.id\n  name       = "test"\n  auto_deploy = true\n}\n\nresource "aws_lambda_permission" "invoke_lambda" {\n  function_name = aws_lambda_function.example.function_name\n  action        = "lambda:InvokeFunction"\n  principal     = "apigateway.amazonaws.com"\n  source_arn    = "${aws_apigatewayv2_route.example_route.execution_arn}/*/*"\n}\n',
-                                        'file': 'api_gateway.tf'}],
-     'parameters': [{'parameter': 'function_name', 'description': 'Name of the AWS Lambda function', 'type': 'string'},
-                    {'parameter': 'runtime', 'description': 'Runtime environment for the Lambda function',
-                     'type': 'string'},
-                    {'parameter': 'handler', 'description': 'Handler function in Lambda', 'type': 'string'},
-                    {'parameter': 'filename', 'description': 'Path to the zip file containing the function code',
-                     'type': 'string'}]}
+    obj = {'type': 'terraform', 'steps': [{'content': 'resource "aws_iam_role" "lambda_exec" {\n  name = "lambda-exec"\n\n  assume_role_policy = jsonencode({\n    Version = "2012-10-17"\n    Statement = [\n      {\n        Action = "sts:AssumeRole"\n        Effect = "Allow"\n        Principal = {\n          Service = "lambda.amazonaws.com"\n        }\n      }\n    ]\n  })\n}', 'file': 'iam.tf'}, {'content': 'resource "aws_iam_role_policy_attachment" "attach_policy" {\n  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"\n  role       = aws_iam_role.lambda_exec.name\n}', 'file': 'iam.tf'}, {'content': 'resource "aws_lambda_function" "main" {\n  function_name    = "example_lambda"\n  filename         = <zip_file_path>\n  source_code_hash = filebase64sha256(<zip_file_path>).\n  role             = aws_iam_role.lambda_exec.arn\n  handler          = <handler>\n  runtime          = <runtime>\n}', 'file': 'lambda.tf'}, {'content': 'resource "aws_apigatewayv2_api" "main" {\n  name          = "lambda-api-gateway"\n  protocol_type = "HTTP"\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_apigatewayv2_integration" "main" {\n  api_id           = aws_apigatewayv2_api.main.id\n  integration_type = "AWS_PROXY"\n  integration_uri  = aws_lambda_function.main.invoke_arn\n  payload_format_version = "2.0"\n}\n\nresource "aws_apigatewayv2_route" "main" {\n  api_id    = aws_apigatewayv2_api.main.id\n  route_key = "ANY /{proxy+}"\n  target    = "integrations/${aws_apigatewayv2_integration.main.id}"\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_apigatewayv2_stage" "main" {\n  api_id     = aws_apigatewayv2_api.main.id\n  name       = "$default"\n  auto_deploy = true\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_lambda_permission" "main" {\n  action        = "lambda:InvokeFunction"\n  function_name = aws_lambda_function.main.function_name\n  principal     = "apigateway.amazonaws.com"\n  source_arn    = aws_apigatewayv2_api.main.execution_arn\n}', 'file': 'lambda.tf'}], 'parameters': [{'parameter': 'zip_file_path', 'description': 'Path to the zipped Lambda function code', 'type': 'string'}, {'parameter': 'handler', 'description': 'Lambda function handler (e.g., index.handler)', 'type': 'string'}, {'parameter': 'runtime', 'description': 'Runtime for the Lambda function (e.g., nodejs14.x)', 'options': ['nodejs14.x', 'python3.8', 'go1.x'], 'type': 'string'}]}
 
     exe = TerraformExecutor(obj=obj, directory="tf-gen-test/")
     exe.run()
-    exe.init()

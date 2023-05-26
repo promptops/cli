@@ -45,7 +45,6 @@ def init_recipe(
         },
     )
     if response.status_code != 200:
-        # this exception completely destroys the ui
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
     data = response.json()
@@ -97,7 +96,6 @@ def run(script: str, lang: str = "shell") -> (int, Optional[str]):
             sys.stdout.write(proc.stderr.decode("utf-8"))
         sys.stdout.flush()
 
-        # history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), proc.returncode)
         return proc.returncode, str(proc.stderr)
     else:
         raise NotImplementedError(f"{lang} not implemented yet")
@@ -137,6 +135,7 @@ def print_steps(steps):
     for i, step in enumerate(steps):
         print(f"{i + 1}. {step}")
     print()
+
 
 def edit_steps(steps_obj):
     steps = steps_obj.get('steps', [])
@@ -199,9 +198,6 @@ def workflow_entrypoint(args):
     with loading_animation(Simple("processing instructions...")):
         recipe = init_recipe(prompt, steps, LANG_OPTIONS[selection])
 
-    executor = TerraformExecutor(recipe, "/test-cli/")
+    executor = TerraformExecutor(recipe, input("enter a relative directory to store the terraform in: "))
     executor.run()
-    executor.init()
-    executor.plan()
-    executor.apply()
     return
