@@ -1,4 +1,4 @@
-DEFAULT_ENDPOINT = "https://cli.promptops.com"
+DEFAULT_ENDPOINT = "http://0.0.0.0:8080"
 
 
 endpoint: str = DEFAULT_ENDPOINT

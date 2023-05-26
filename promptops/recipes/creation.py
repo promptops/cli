@@ -1,7 +1,7 @@
 import logging
 import os
 import subprocess
-from typing import Optional
+from typing import Optional, List
 
 import requests
 import sys
@@ -9,18 +9,34 @@ import sys
 from promptops import settings
 from promptops import trace
 from promptops import user
+from promptops.loading import loading_animation, Simple
+from promptops.recipes.terraform import TerraformExecutor
 from promptops.ui import selections
+from promptops.ui.vim import edit_with_vim
+
+LANG_SHELL = 'shell'
+LANG_TF = 'terraform'
+LANG_OPTIONS = [LANG_TF, LANG_SHELL]
 
 
 def init_recipe(
     q: str,
+    steps: dict,
+    language: str
 ):
     req = {
         "prompt": q,
         "trace_id": trace.trace_id,
         "platform": sys.platform,
-        "shell": os.environ.get("SHELL"),
+        "steps": steps.get('steps'),
+        "questions": steps.get('questions'),
+        "parameters": steps.get('parameters')
     }
+    if language == LANG_SHELL:
+        req['shell'] = os.environ.get('SHELL')
+    else:
+        req['language'] = language
+
     response = requests.post(
         settings.endpoint + "/recipe",
         json=req,
@@ -40,7 +56,37 @@ def init_recipe(
     return data
 
 
-def run(script: str, lang: str="shell") -> (int, Optional[str]):
+def get_steps(prompt: str, language: str):
+    req = {
+        "prompt": prompt,
+        "trace_id": trace.trace_id,
+        "platform": sys.platform,
+        "language": language,
+    }
+
+    if language == LANG_SHELL:
+        req['shell'] = os.environ.get("SHELL")
+
+    response = requests.post(
+        settings.endpoint + "/recipe/steps",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    data = response.json()
+
+    if not data.get("steps"):
+        raise Exception(f"missing steps")
+
+    return data
+
+
+def run(script: str, lang: str = "shell") -> (int, Optional[str]):
     if lang == "shell":
         proc = subprocess.run(
             script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -87,80 +133,75 @@ def execute_step(step):
             value = input("enter a value for the parameter: ")
 
 
+def print_steps(steps):
+    for i, step in enumerate(steps):
+        print(f"{i + 1}. {step}")
+    print()
 
-def workflow_entrypoint(prompt):
-    if not prompt.question or len(prompt.question) < 1:
+def edit_steps(steps_obj):
+    steps = steps_obj.get('steps', [])
+    print("Based on your requirements, I've set the project outline to include the following steps ")
+
+    print_steps(steps)
+
+    options = ["edit in vim", "clarify", "continue"]
+    selection = None
+    while selection != 2:
+        ui = selections.UI(options, is_loading=False)
+        selection = ui.input()
+        if selection == 0:
+            edited = edit_with_vim("\n".join(steps))
+            steps_obj['steps'] = edited.split("\n")
+            steps = steps_obj['steps']
+            print_steps(steps)
+        elif selection == 1:
+            # clarification = input("enter more details: ")
+            print("Sorry! Automated clarification coming soon!")
+
+    parameters = steps_obj.get('parameters', [])
+
+    steps_obj['parameters'] = {}
+    for parameter in parameters:
+        question = parameter.get('question')
+        param = parameter.get('parameter')
+        if parameter.get("options"):
+            print(question)
+            ui = selections.UI(parameter.get('options'), is_loading=False)
+            selection = ui.input()
+            value = parameter.get('options')[selection]
+        else:
+            value = input(f"{question}: ")
+        steps_obj['parameters'][param] = value
+
+    questions = steps_obj.get('clarification_questions', [])
+    steps_obj['questions'] = {}
+    for question in questions:
+        steps_obj['questions'][question] = input(f"{question}: ")
+
+    return steps_obj
+
+
+def workflow_entrypoint(args):
+    if not args.question or len(args.question) < 1:
         print("you must include a question")
         return
+    prompt = " ".join(args.question)
 
-    # recipe = init_recipe(prompt)
+    print("choose a method to execute this workflow\n")
+    ui = selections.UI(LANG_OPTIONS, is_loading=False)
+    selection = ui.input()
+    print()
 
-    recipe = {
-        "name": "Provide a name",
-        "description": "Provide a description",
-        "steps": [
-            {
-                "command": "aws iam create-role --role-name <lambda-role-name> --assume-role-policy-document file://<path-to-trust-policy-json-file>",
-                "parameters": [
-                    {
-                        "name": "lambda-role-name",
-                        "description": "name of the Lambda role",
-                        "resolve": "aws iam list-roles --query 'Roles[].RoleName' --output text"
-                    },
-                    {
-                        "name": "path-to-trust-policy-json-file",
-                        "description": "local file path for trust policy document",
-                        "create": "echo '{\n            \"Version\": \"2012-10-17\",\n            \"Statement\": [\n            {\n            \"Effect\": \"Allow\",\n            \"Principal\": {\n            \"Service\": \"lambda.amazonaws.com\"\n            },\n            \"Action\": \"sts:AssumeRole\"\n            }\n            ]\n            }' > trust-policy.json"
-                    }
-                ]
-            },
-            {
-                "command": "aws iam attach-role-policy --role-name <lambda-role-name> --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-                "parameters": [
-                    {
-                        "name": "lambda-role-name",
-                        "description": "name of the Lambda execution role",
-                        "resolve": "aws iam list-roles --query 'Roles[].RoleName' --output text"
-                    },
-                    {
-                        "name": "policy-arn",
-                        "description": "ARN of the AWSLambdaBasicExecutionRole policy",
-                        "resolve": "aws iam list-policies --scope AWS --query 'Policies[?PolicyName==`AWSLambdaBasicExecutionRole`].Arn' --output text"
-                    }
-                ]
-            },
-            {
-                "command": "aws lambda create-function --function-name <lambda-function-name> --runtime <runtime> --role <lambda-role-arn> --handler <handler> --zip-file fileb://<path-to-zip-file>",
-                "parameters": [
-                    {
-                        "name": "<lambda-function-name>",
-                        "description": "name of the Lambda function",
-                        "resolve": "aws lambda list-functions --query 'Functions[].FunctionName' --output text"
-                    },
-                    {
-                        "name": "<runtime>",
-                        "description": "runtime environment for the Lambda function"
-                    },
-                    {
-                        "name": "<lambda-role-arn>",
-                        "description": "ARN of the IAM role that Lambda assumes when it executes the function",
-                        "resolve": "aws iam list-roles --query 'Roles[?RoleName==`<lambda-role-name>`].Arn' --output text"
-                    },
-                    {
-                        "name": "<handler>",
-                        "description": "entry point of the Lambda function"
-                    },
-                    {
-                        "name": "<path-to-zip-file>",
-                        "description": "local file path for the ZIP file containing the Lambda function code",
-                        "create": "zip -r <zip-file-name> <source-code-directory>"
-                    }
-                ]
-            }
-        ]
-    }
+    with loading_animation(Simple("getting an outline ready...")):
+        steps = get_steps(prompt, LANG_OPTIONS[selection])
+    steps = edit_steps(steps)
 
-    for step in recipe.get("steps"):
-        execute_step(step)
+    with loading_animation(Simple("processing instructions...")):
+        recipe = init_recipe(prompt, steps, LANG_OPTIONS[selection])
 
+    executor = TerraformExecutor(recipe, "/test-cli/")
+    executor.run()
+    executor.init()
+    executor.plan()
+    executor.apply()
     return

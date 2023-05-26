@@ -275,7 +275,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
 
 def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
     selected = prompts.confirm(
-        f"looks like the command failed (return code was not 0), would you like us to attempt to fix it?"
+        f"It looks like the command failed, would you like us to attempt to fix it using the stderr output?"
     )
     if selected == prompts.GO_BACK:
         return None
@@ -362,14 +362,14 @@ def do_query(question: str):
     feedback({"event": "run"})
     revised_cmd = copy(cmd)
     revised_cmd.script = confirmed
-    rc, stdout = run(revised_cmd)
+    rc, stderr = run(revised_cmd)
     feedback({"event": "finished", "rc": rc})
 
     while rc != 0:
-        corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stdout)
+        corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stderr)
         if not corrected_cmd:
             return
-        rc, stdout = run(corrected_cmd)
+        rc, stderr = run(corrected_cmd)
         if rc == 0:
             db = corrections.get_db()
             q = "\n".join(questions)
