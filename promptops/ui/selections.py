@@ -9,24 +9,6 @@ import wcwidth
 import colorama
 
 
-def getch():
-    if sys.platform == "win32":
-        import msvcrt
-
-        return msvcrt.getwch()
-    else:
-        import tty
-        import termios
-
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            return sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-
 FOOTER_SECTIONS = {
     "select": f"{colorama.Style.BRIGHT}[↑/↓]{colorama.Style.RESET_ALL} select",
     "confirm": f"{colorama.Style.BRIGHT}[enter]{colorama.Style.RESET_ALL} confirm",
@@ -62,15 +44,24 @@ class UI(object):
         self._actions = actions or {}
 
         self._lines_written = 0
+        self._raw_mode = False
+        self._old_stdin_attrs = None
         self.render()
         self._thread.start()
 
     def render(self):
         with self._lock:
+            if self._raw_mode:
+                import termios
+                fd = sys.stdin.fileno()
+                termios.tcsetattr(fd, termios.TCSADRAIN, self._old_stdin_attrs)
+
             # clean all the lines that were written
-            sys.stdout.write("\r\x1b[K")
+            sys.stdout.write("\x1b[2K")
             for _ in range(self._lines_written):
-                sys.stdout.write("\x1b[1A\x1b[K")
+                sys.stdout.write("\x1b[1A\x1b[2K")
+            sys.stdout.write("\r")
+
             size = os.get_terminal_size()
             width = size.columns
             self._option_indexes = []
@@ -82,42 +73,43 @@ class UI(object):
                     text = f" {self._cursor} {self._get_formatted_text(option, True)}"
                 else:
                     text = f"   {self._get_formatted_text(option, False)}"
-                sys.stdout.write(f"\r{text}")
-                sys.stdout.write("\n\r")
+                sys.stdout.write(f"{text}\n")
                 for line in to_plain_text(ANSI(text)).split("\n"):
-                    current_line += 1
                     text_width = wcwidth.wcswidth(line)
-                    if text_width > width:
-                        current_line += text_width // width
+                    current_line += 1  # we always write at least one line
+                    current_line += text_width // width
 
             if self._is_loading:
                 self._loading_line_index = current_line
                 if self._show_timer:
-                    sys.stdout.write(f"\r  {self._spinner(advance=False)} {(time.time() - self._start):.2f}s\n\r")
+                    sys.stdout.write(f"  {self._spinner(advance=False)} {(time.time() - self._start):.2f}s\n")
                 else:
-                    sys.stdout.write(f"\r  {self._spinner(advance=False)}\n\r")
+                    sys.stdout.write(f"  {self._spinner(advance=False)}\n")
                 current_line += 1
 
             if self._footer:
-                sys.stdout.write(f"\n\r{self._footer}")
+                sys.stdout.write(f"\n{self._footer}")
                 current_line += 1
 
             self._lines_written = current_line
 
             sys.stdout.flush()
+            if self._raw_mode:
+                import tty
+                fd = sys.stdin.fileno()
+                tty.setraw(fd)
 
     def _loading_animation(self):
         while True:
             with self._lock:
                 if self._is_loading:
-                    # sys.stdout.write("\x1b[s")
                     sys.stdout.write("\x1b7")
-                    sys.stdout.write(f"\x1b[{self._lines_written - self._loading_line_index}A\x1b[K")
+                    sys.stdout.write(f"\x1b[{self._lines_written - self._loading_line_index}A")
+                    sys.stdout.write("\x1b[2K\r")
                     if self._show_timer:
-                        sys.stdout.write(f"\r   {self._spinner()} {(time.time() - self._start):.2f}s\n\r")
+                        sys.stdout.write(f"   {self._spinner()} {(time.time() - self._start):.2f}s\n")
                     else:
-                        sys.stdout.write(f"\r   {self._spinner()}\n\r")
-                    # sys.stdout.write("\x1b[u")
+                        sys.stdout.write(f"   {self._spinner()}\n")
                     sys.stdout.write("\x1b8")
                     sys.stdout.flush()
 
@@ -135,8 +127,8 @@ class UI(object):
             sys.stdout.write("\x1b8")
             sys.stdout.write("\x1b7")
             sys.stdout.write(f"\x1b[{self._lines_written - self._option_indexes[self._selected]}A")
-            sys.stdout.write(f"\r\x1b[K   {self._get_formatted_text(self._options[self._selected], False)}")
-            sys.stdout.write(f"\x1b[{self._lines_written}B\r")
+            sys.stdout.write(f"\r   {self._get_formatted_text(self._options[self._selected], False)}")
+            sys.stdout.write(f"\x1b[{self._lines_written}B")
             sys.stdout.write("\x1b8")
             sys.stdout.flush()
             self._selected = index
@@ -172,17 +164,37 @@ class UI(object):
         self._is_loading = is_loading
         self.render()
 
+    def getch(self):
+        if sys.platform == "win32":
+            import msvcrt
+
+            return msvcrt.getwch()
+        else:
+            import tty
+            import termios
+
+            fd = sys.stdin.fileno()
+            old = termios.tcgetattr(fd)
+            self._old_stdin_attrs = old
+            try:
+                tty.setraw(fd)
+                self._raw_mode = True
+                return sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+                self._raw_mode = False
+
     def input(self):
         while True:
-            key = getch()
+            key = self.getch()
             if key == "\x03":
                 if self._footer:
                     sys.stdout.write("\r\x1b[K")
                 raise KeyboardInterrupt()
             elif key == "\x1b":
-                next_ch = getch()
+                next_ch = self.getch()
                 if next_ch == "[":
-                    last_ch = getch()
+                    last_ch = self.getch()
                     if last_ch == "A":
                         index = max(0, self._selected - 1)
                         self.select(index)
