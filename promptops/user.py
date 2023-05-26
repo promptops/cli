@@ -36,7 +36,7 @@ def has_registered() -> bool:
     return os.path.exists(real_path)
 
 
-def config_flow() -> Optional[dict]:
+def config_flow() -> dict:
     config_selections = {}
 
     print()
@@ -49,7 +49,7 @@ def config_flow() -> Optional[dict]:
     ui = selections.UI(options, is_loading=False)
     selection = ui.input()
     if selection == 1:
-        return
+        return config_selections
 
     print()
     print()
@@ -96,7 +96,7 @@ def config_flow() -> Optional[dict]:
                 if choice == GO_BACK:
                     break
                 if choice == EXIT:
-                    return
+                    return config_selections
                 if choice.isdigit():
                     # TODO: validate
                     break
