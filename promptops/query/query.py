@@ -27,6 +27,7 @@ from promptops.feedback import feedback
 from promptops import history
 from promptops import settings_store
 from promptops import scrub_secrets
+from promptops import shells
 from .dtos import Result
 from .explanation import get_explanation, ReturningThread
 from . import messages
@@ -104,7 +105,7 @@ class ConfirmResult:
     options: list = None
 
 
-def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmResult:
+def revise_loop(questions: list[str], prev_results: list[list[str]], history_context: list[str]) -> ConfirmResult:
     embedding = similarity.embedding(text="\n".join(questions))
     update_lock = threading.Lock()
     corrected_results = []
@@ -139,7 +140,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
                 corrected_results=[qa for qa, _ in similar_corrections],
                 prev_results=prev_results,
                 similar_history=[r.script for r in history_results],
-                history_context=[],
+                history_context=history_context,
             ),
             daemon=True,
         )
@@ -252,7 +253,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]]) -> ConfirmR
                             prev_results=prev_results,
                             corrected_results=[qa for qa, _ in similar_corrections],
                             similar_history=[r.script for r in history_results],
-                            history_context=[],
+                            history_context=history_context,
                         ),
                         daemon=True,
                     )
@@ -347,9 +348,10 @@ def do_query(question: str):
     print()
 
     def input_loop():
+        history_context = shells.get_shell().get_recent_history(settings.history_context) if settings.history_context else []
         while True:
             try:
-                results = revise_loop(questions, prev_results)
+                results = revise_loop(questions, prev_results, history_context)
                 if results.result:
                     return results.result, results.confirmed
                 else:
