@@ -48,10 +48,10 @@ def deduplicate(results: list[Result]):
 
 def printer(pipe, func):
     for line in iter(pipe.readline, b''):
-        line_decoded = line.decode()
-        sys.stdout.write(line_decoded.strip())
+        line_decoded = line.decode().strip()
+        sys.stdout.write(line_decoded)
         sys.stdout.flush()
-        func(line_decoded)
+        func(line)
     pipe.close()
 
 
