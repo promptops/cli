@@ -97,8 +97,15 @@ class TerraformExecutor:
                 open(self.directory + step.file, 'w').close()
             for parameter in self.parameters:
                 if parameter['parameter'] in step.content:
+                    if parameter['type'] == "int":
+                        value = parameter['value']
+                    elif parameter['type'] == "list":
+                        items = [f'"{i}"' for i in parameter['value']]
+                        value = f"[{' ,'.join(items)}]"
+                    else:
+                        value = f"\"{parameter['value']}\""
+
                     var_name = f"<{parameter['parameter']}>"
-                    value = f"\"{parameter['value']}\""
                     step.content = step.content.replace(var_name, value)
 
             with open(self.directory + step.file, "w") as outfile:
