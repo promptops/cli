@@ -11,19 +11,24 @@ class Step:
     content: str
 
 
+_DEBUG = False
+
+
 class TerraformExecutor:
     def __init__(self, obj, directory):
-        print(obj)
+        if _DEBUG:
+            print(obj)
         self.steps = [Step(i.get('file'), i.get('content')) for i in obj.get('steps')]
         self.parameters = obj.get('parameters')
         directory = directory.strip()
         directory = directory if directory[0] != "/" else directory[1:]
+        directory = directory if directory[-1] == "/" else directory + "/"
         self.directory = os.path.expanduser(directory)
 
     def run(self):
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
-        print("working in director: ", self.directory)
+        print("working in directory: ", self.directory)
         self.resolve_unfilled_parameters()
         self.execute()
 
