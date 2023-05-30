@@ -53,8 +53,8 @@ class TerraformExecutor:
             elif selection == 3:
                 self.plan()
             elif selection == 4:
-                self.apply()
-                break
+                if self.apply():
+                    break
             print()
 
     def resolve_unfilled_parameters(self):
@@ -97,7 +97,9 @@ class TerraformExecutor:
                 open(self.directory + step.file, 'w').close()
             for parameter in self.parameters:
                 if parameter['parameter'] in step.content:
-                    step.content = step.content.replace(parameter['parameter'], parameter['value'])
+                    var_name = f"<{parameter['parameter']}>"
+                    value = f"\"{parameter['value']}\""
+                    step.content = step.content.replace(var_name, value)
 
             with open(self.directory + step.file, "w") as outfile:
                 outfile.write(step.content)
