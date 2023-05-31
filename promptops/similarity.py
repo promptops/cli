@@ -30,6 +30,15 @@ class VectorDB(object):
         results = np.argsort(scores)[::-1]
         return [(self.objects[i], scores[i]) for i in results[:k] if scores[i] > min_similarity]
 
+    def argsearch(self, vector, k=1, min_similarity=0.8):
+        # compute cosine similarity
+        if len(self.vectors) == 0:
+            return []
+        scores = np.dot(vector, self.vectors.T).flatten()
+        # rank results
+        results = np.argsort(scores)[::-1]
+        return [(i, scores[i]) for i in results[:k] if scores[i] > min_similarity]
+
     def index(self, obj):
         return self.objects.index(obj)
 
