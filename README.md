@@ -12,9 +12,16 @@
 
 # Installation
 
-## pip (preferred)
+## Ubuntu Linux 
+```shell
+curl -fsSL -o ubuntu-installer.sh https://raw.githubusercontent.com/promptops/cli/main/ubuntu-installer.sh
+chmod 700 ubuntu-installer.sh
+./ubuntu-installer.sh
+```
 
-Make sure you have python 3.9 or more recent
+## pip 
+
+Make sure you have python 3.10 or more recent
 
 ```shell
 pip3 install promptops
