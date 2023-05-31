@@ -28,6 +28,7 @@ from promptops import history
 from promptops import settings_store
 from promptops import scrub_secrets
 from promptops import shells
+from promptops.index import index_store
 from .dtos import Result
 from .explanation import get_explanation, ReturningThread
 from . import messages
@@ -86,6 +87,19 @@ def corrections_search(embedding):
     return [(corrections.QATuple.from_dict(s), score) for s, score in similar]
 
 
+def search_indexed_fragments(embedding, current_dir: str) -> list[index_store.SearchResult]:
+    store = index_store.IndexStore(os.path.expanduser(settings.user_index_root))
+
+    def accept_source(meta: index_store.ItemMetadata):
+        if meta.item_type != "file":
+            return True
+        dirname = os.path.dirname(meta.item_location)
+        return current_dir.startswith(dirname)
+
+    similar = store.search(embedding, k=3, min_similarity=0.7, accept_source=accept_source)
+    return similar
+
+
 def make_revise_option():
     return "\x1b[3m💭️ don't see what you're looking for? try providing more context\x1b[0m"
 
@@ -130,6 +144,17 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
     results = corrected_results + history_results
     results = deduplicate(results)
 
+    relevant_indexed_data = search_indexed_fragments(embedding, os.getcwd())
+    if len(relevant_indexed_data) > 0:
+        print("found information that might be relevant to your question in:")
+        printed = set()
+        for r in relevant_indexed_data:
+            if r.item.item_location in printed:
+                continue
+            print(f"  ● {r.item.item_location}")
+            printed.add(r.item.item_location)
+        print()
+
     ui = None
     tasks = [
         ReturningThread(
@@ -141,6 +166,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
                 prev_results=prev_results,
                 similar_history=[r.script for r in history_results],
                 history_context=history_context,
+                relevant_indexed_data=relevant_indexed_data,
             ),
             daemon=True,
         )
@@ -431,6 +457,7 @@ def query(
     corrected_results: list[corrections.QATuple],
     history_context: list[str],
     similar_history: list[str],
+    relevant_indexed_data: list[index_store.SearchResult],
 ) -> list[Result]:
     req = {
         "query": q,
@@ -442,6 +469,13 @@ def query(
             "corrections": [
                 (qa.question, scrub_secrets.scrub_line("~/.bash_history", qa.corrected)) for qa in corrected_results
             ],
+            "user_data": [
+                {
+                    "source_type": r.item.item_type,
+                    "source": r.item.item_location,
+                    "fragment": r.fragment.fragment,
+                } for r in relevant_indexed_data
+            ]
         },
         "model": settings.model,
         "trace_id": trace.trace_id,

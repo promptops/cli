@@ -28,6 +28,7 @@ from promptops import version_check
 from promptops import query
 from promptops import user
 from promptops.recipes.creation import workflow_entrypoint
+from promptops.index.entry_point import entry_point as index_entry_point
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
@@ -183,6 +184,12 @@ def entry_main():
     parser_workflow = subparsers.add_parser("workflow", help="run a complex or multi-stepped script")
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
     parser_workflow.set_defaults(func=workflow_entrypoint)
+
+    parser_index = subparsers.add_parser("index", help="manage the indexed data")
+    parser_index.add_argument("action", choices=["list", "add", "remove", "test"], help="list or update the index")
+    parser_index.add_argument("--source", help="the source to add or remove")
+    parser_index.add_argument("--query", help="query to test with")
+    parser_index.set_defaults(func=index_entry_point)
 
     args = parser.parse_args()
 
