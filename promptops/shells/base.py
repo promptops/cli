@@ -11,6 +11,7 @@ CMDS_TO_EXCLUDE = [
     "um",
     "qq",
     "promptops query",
+    "python -m promptops.main query",
 ]
 
 

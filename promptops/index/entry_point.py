@@ -2,6 +2,8 @@ import datetime
 import logging
 import os.path
 import json
+import sys
+import tempfile
 
 import numpy as np
 import requests
@@ -17,7 +19,7 @@ from promptops.secrets import scrub_file
 from .index_store import IndexStore, ItemMetadata
 
 
-def index_content(content: str, content_type: str) -> VectorDB:
+def index_content(content: str | bytes, content_type: str) -> VectorDB:
     response = requests.post(
         settings.endpoint + "/index_data?trace_id=" + trace_id,
         headers={
@@ -54,27 +56,50 @@ def index_content(content: str, content_type: str) -> VectorDB:
     return db
 
 
+def index_file(path: str) -> (ItemMetadata, VectorDB):
+    mimetype, _ = mimetypes.guess_type(path)
+    logging.debug("content-type: " + mimetype)
+    with open(path, "r") as f:
+        lines = f.readlines()
+        lines = scrub_file(path, lines)
+        db = index_content("".join(lines), mimetype)
+    path = os.path.abspath(path)
+    return ItemMetadata(
+        item_type="file",
+        item_location=path,
+        index_location="",  # this is set by the store
+        added_on=datetime.datetime.now(),
+        last_indexed_on=datetime.datetime.now(),
+        watch=True,
+    ), db
+
+
+def index_url(location: str) -> (ItemMetadata, VectorDB):
+    response = requests.get(location)
+    mimetype = response.headers["content-type"]
+    logging.debug("content-type: " + mimetype)
+    db = index_content(response.content, mimetype)
+    return ItemMetadata(
+        item_type="url",
+        item_location=location,
+        index_location="",  # this is set by the store
+        added_on=datetime.datetime.now(),
+        last_indexed_on=datetime.datetime.now(),
+        watch=True,
+    ), db
+
+
 def entry_point(args):
     if args.action == "add":
-        source_path = args.source
         mimetypes.add_type("text/markdown", ".md")
-        mimetype, _ = mimetypes.guess_type(source_path)
+        source_path = args.source
         print("indexing:", source_path)
-        logging.debug("content-type: " + mimetype)
-        with open(source_path, "r") as f:
-            lines = f.readlines()
-            lines = scrub_file(source_path, lines)
-            db = index_content("".join(lines), mimetype)
+        if args.source.startswith("http://") or args.source.startswith("https://"):
+            item_meta, db = index_url(source_path)
+        else:
+            item_meta, db = index_file(source_path)
         store = IndexStore(os.path.expanduser(settings.user_index_root))
-        path = os.path.abspath(source_path)
-        store.add_or_update(ItemMetadata(
-            item_type="file",
-            item_location=path,
-            index_location="",
-            added_on=datetime.datetime.now(),
-            last_indexed_on=datetime.datetime.now(),
-            watch=True,
-        ), db)
+        store.add_or_update(item_meta, db)
     elif args.action == "test":
         store = IndexStore(os.path.expanduser(settings.user_index_root))
         vector = embedding(args.query)
