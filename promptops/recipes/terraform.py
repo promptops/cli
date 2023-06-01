@@ -2,6 +2,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 
+from promptops.loading import loading_animation, Simple
 from promptops.ui import selections
 
 
@@ -11,31 +12,30 @@ class Step:
     content: str
 
 
-_DEBUG = False
-
-
 class TerraformExecutor:
-    def __init__(self, obj, directory):
-        if _DEBUG:
-            print(obj)
-        self.steps = [Step(i.get('file'), i.get('content')) for i in obj.get('steps')]
-        self.parameters = obj.get('parameters')
+    def __init__(self, recipe, directory):
+        print(recipe)
+        self.recipe = recipe
+        self.execution_steps = [Step(i.get('file'), i.get('content')) for i in recipe.get('execution')]
+        self.parameters = recipe.get('parameters')
         directory = directory.strip()
         directory = directory if directory[0] != "/" else directory[1:]
         directory = directory if directory[-1] == "/" else directory + "/"
         self.directory = os.path.expanduser(directory)
 
-    def run(self):
+    def write_files(self):
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
         print("working in directory: ", self.directory)
         self.resolve_unfilled_parameters()
         self.execute()
-
         print()
         print(f"please verify that the terraform files in directory {self.directory} are correct")
         print()
 
+
+    def run(self, regen):
+        self.write_files()
         options = ["exit", "re-generate files", "terraform init"]
 
         while True:
@@ -45,16 +45,24 @@ class TerraformExecutor:
             if selection == 0:
                 break
             elif selection == 1:
-                self.fix()
-                print("Coming soon. Please try a different option.")
+                # todo: Create a cache of parameter values before regenerating!
+                with loading_animation(Simple("regenerating terraform files...")):
+                    self.recipe = regen(self.recipe, input("Provide more clarification (optional): "))
+                self.execution_steps = [Step(i.get('file'), i.get('content')) for i in self.recipe.get('execution')]
+                self.parameters = self.recipe.get('parameters')
+                self.clean()
+                self.write_files()
             elif selection == 2:
                 self.init()
                 options.extend(["terraform plan", "terraform apply"])
             elif selection == 3:
-                self.plan()
+                if not self.plan():
+                    self.fix()
             elif selection == 4:
                 if self.apply():
                     break
+                else:
+                    self.fix()
             print()
 
     def resolve_unfilled_parameters(self):
@@ -92,7 +100,7 @@ class TerraformExecutor:
         return self.parameters
 
     def execute(self):
-        for step in self.steps:
+        for step in self.execution_steps:
             if not os.path.exists(self.directory + step.file):
                 open(self.directory + step.file, 'w').close()
             for parameter in self.parameters:
@@ -111,6 +119,11 @@ class TerraformExecutor:
             with open(self.directory + step.file, "w") as outfile:
                 outfile.write(step.content)
 
+    def clean(self):
+        for step in self.execution_steps:
+            if os.path.exists(self.directory + step.file):
+                os.remove(self.directory + step.file)
+
     def init(self):
         subprocess.run(f"ls {self.directory}", shell=True, start_new_session=True,)
         subprocess.run("terraform init", shell=True, start_new_session=True, cwd=self.directory)
@@ -122,12 +135,6 @@ class TerraformExecutor:
         return subprocess.run("terraform apply", shell=True, start_new_session=True, cwd=self.directory).returncode == 0
 
     def fix(self):
-        # print("attempting to fix terraform files in " + self.directory)
+        print("Auto-fix coming soon.")
         return
 
-
-if __name__ == "__main__":
-    obj = {'type': 'terraform', 'steps': [{'content': 'resource "aws_iam_role" "lambda_exec" {\n  name = "lambda-exec"\n\n  assume_role_policy = jsonencode({\n    Version = "2012-10-17"\n    Statement = [\n      {\n        Action = "sts:AssumeRole"\n        Effect = "Allow"\n        Principal = {\n          Service = "lambda.amazonaws.com"\n        }\n      }\n    ]\n  })\n}', 'file': 'iam.tf'}, {'content': 'resource "aws_iam_role_policy_attachment" "attach_policy" {\n  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"\n  role       = aws_iam_role.lambda_exec.name\n}', 'file': 'iam.tf'}, {'content': 'resource "aws_lambda_function" "main" {\n  function_name    = "example_lambda"\n  filename         = <zip_file_path>\n  source_code_hash = filebase64sha256(<zip_file_path>).\n  role             = aws_iam_role.lambda_exec.arn\n  handler          = <handler>\n  runtime          = <runtime>\n}', 'file': 'lambda.tf'}, {'content': 'resource "aws_apigatewayv2_api" "main" {\n  name          = "lambda-api-gateway"\n  protocol_type = "HTTP"\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_apigatewayv2_integration" "main" {\n  api_id           = aws_apigatewayv2_api.main.id\n  integration_type = "AWS_PROXY"\n  integration_uri  = aws_lambda_function.main.invoke_arn\n  payload_format_version = "2.0"\n}\n\nresource "aws_apigatewayv2_route" "main" {\n  api_id    = aws_apigatewayv2_api.main.id\n  route_key = "ANY /{proxy+}"\n  target    = "integrations/${aws_apigatewayv2_integration.main.id}"\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_apigatewayv2_stage" "main" {\n  api_id     = aws_apigatewayv2_api.main.id\n  name       = "$default"\n  auto_deploy = true\n}', 'file': 'api-gateway.tf'}, {'content': 'resource "aws_lambda_permission" "main" {\n  action        = "lambda:InvokeFunction"\n  function_name = aws_lambda_function.main.function_name\n  principal     = "apigateway.amazonaws.com"\n  source_arn    = aws_apigatewayv2_api.main.execution_arn\n}', 'file': 'lambda.tf'}], 'parameters': [{'parameter': 'zip_file_path', 'description': 'Path to the zipped Lambda function code', 'type': 'string'}, {'parameter': 'handler', 'description': 'Lambda function handler (e.g., index.handler)', 'type': 'string'}, {'parameter': 'runtime', 'description': 'Runtime for the Lambda function (e.g., nodejs14.x)', 'options': ['nodejs14.x', 'python3.8', 'go1.x'], 'type': 'string'}]}
-
-    exe = TerraformExecutor(obj=obj, directory="tf-gen-test/")
-    exe.run()

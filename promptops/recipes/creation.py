@@ -1,4 +1,3 @@
-import logging
 import os
 import subprocess
 from typing import Optional, List
@@ -19,18 +18,38 @@ LANG_TF = 'terraform'
 LANG_OPTIONS = [LANG_TF, LANG_SHELL]
 
 
-def init_recipe(
-    q: str,
-    steps: dict,
-    language: str
-):
+def regenerate_recipe_execution(recipe, clarification):
     req = {
-        "prompt": q,
         "trace_id": trace.trace_id,
-        "platform": sys.platform,
-        "steps": steps.get('steps'),
-        "questions": steps.get('questions'),
-        "parameters": steps.get('parameters')
+        "id": recipe['id'],
+        "parameters": recipe['parameters'],
+        "clarification": clarification
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/regenerate",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
+    if response.status_code != 200:
+        print(response.json())
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    data = response.json()
+
+    if not data.get("steps"):
+        raise Exception(f"missing steps")
+
+    return data
+
+
+def get_recipe_execution(recipe: dict, language: str):
+    req = {
+        "trace_id": trace.trace_id,
+        "id": recipe['id'],
+        "parameters": recipe['parameters'],
     }
     if language == LANG_SHELL:
         req['shell'] = os.environ.get('SHELL')
@@ -38,12 +57,37 @@ def init_recipe(
         req['language'] = language
 
     response = requests.post(
-        settings.endpoint + "/recipe",
+        settings.endpoint + "/recipe/execution",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
         },
     )
+    if response.status_code != 200:
+        print(response.json())
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    data = response.json()
+
+    if not data.get("steps"):
+        raise Exception(f"missing steps")
+
+    return data
+
+
+def clarify_steps(recipe, clarification):
+    req = {
+        "id": recipe['id'],
+        "trace_id": trace.trace_id,
+        "clarification": clarification,
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/clarify",
+        json=req,
+        headers={"user-agent": f"promptops-cli; user_id={user.user_id()}"}
+    )
+
     if response.status_code != 200:
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
@@ -55,19 +99,20 @@ def init_recipe(
     return data
 
 
-def get_steps(prompt: str, language: str):
+def init_recipe(prompt: str, language: str):
     req = {
         "prompt": prompt,
         "trace_id": trace.trace_id,
         "platform": sys.platform,
         "language": language,
+        "author": user.user_id(),
     }
 
     if language == LANG_SHELL:
         req['shell'] = os.environ.get("SHELL")
 
     response = requests.post(
-        settings.endpoint + "/recipe/steps",
+        settings.endpoint + "/recipe/init",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
@@ -101,44 +146,14 @@ def run(script: str, lang: str = "shell") -> (int, Optional[str]):
         raise NotImplementedError(f"{lang} not implemented yet")
 
 
-def execute_step(step):
-    print(f"executing step \n command: {step.get('command')}")
-    print()
-
-    for parameter in step.get("parameters"):
-        print(f"parameter: {parameter.get('name')}")
-        options = ["describe"]
-
-        if parameter.get("resolve"):
-            options.append("resolve")
-        if parameter.get("create"):
-            options.append("create")
-        if parameter.get("options"):
-            options.append("select")
-        options.append("replace")
-        ui = selections.UI(options, is_loading=False)
-        selection = ui.input()
-
-        option = options[selection]
-
-        if option == "resolve" or option == "create":
-            result = run(parameter.get(option))
-        if option == "options":
-            select_ui = selections.UI(parameter.get("options"), is_loading=False)
-            selected_option = select_ui.input()
-            print(selected_option)
-        if options == "replace":
-            value = input("enter a value for the parameter: ")
-
-
 def print_steps(steps):
     for i, step in enumerate(steps):
         print(f"{i + 1}. {step}")
     print()
 
 
-def edit_steps(steps_obj):
-    steps = steps_obj.get('steps', [])
+def edit_steps(recipe):
+    steps = recipe.get('steps', [])
     print("Based on your requirements, I've set the project outline to include the following steps ")
 
     print_steps(steps)
@@ -150,34 +165,35 @@ def edit_steps(steps_obj):
         selection = ui.input()
         if selection == 0:
             edited = edit_with_vim("\n".join(steps))
-            steps_obj['steps'] = edited.split("\n")
-            steps = steps_obj['steps']
+            recipe['steps'] = edited.split("\n")
+            steps = recipe['steps']
             print_steps(steps)
+
+            # TODO: Save the edited steps through the API
         elif selection == 1:
-            # clarification = input("enter more details: ")
-            print("Sorry! Automated clarification coming soon!")
+            print()
+            clarification = input("add details: ").strip()
+            with loading_animation(Simple("weaving in your clarification...")):
+                recipe = clarify_steps(recipe, clarification)
+            steps = recipe.get('steps')
+            print("Based on your requirements & clarification, I've set the project outline to include the following steps ")
+            print_steps(steps)
 
-    parameters = steps_obj.get('parameters', [])
+    # parameters = recipe.get('parameters', [])
 
-    steps_obj['parameters'] = {}
-    for parameter in parameters:
-        question = parameter.get('question')
-        param = parameter.get('parameter')
-        if parameter.get("options"):
-            print(question)
-            ui = selections.UI(parameter.get('options'), is_loading=False)
-            selection = ui.input()
-            value = parameter.get('options')[selection]
-        else:
-            value = input(f"{question}: ")
-        steps_obj['parameters'][param] = value
+    # TODO: Remove this, move "user friendly" questions over to tf generator
+    # for parameter in parameters:
+    #     question = parameter.get('description')
+    #     if parameter.get("options"):
+    #         print(question)
+    #         ui = selections.UI(parameter.get('options'), is_loading=False)
+    #         selection = ui.input()
+    #         value = parameter.get('options')[selection]
+    #     else:
+    #         value = input(f"{question}: ")
+    #     parameter['value'] = value
 
-    questions = steps_obj.get('clarification_questions', [])
-    steps_obj['questions'] = {}
-    for question in questions:
-        steps_obj['questions'][question] = input(f"{question}: ")
-
-    return steps_obj
+    return recipe
 
 
 def workflow_entrypoint(args):
@@ -192,12 +208,12 @@ def workflow_entrypoint(args):
     print()
 
     with loading_animation(Simple("getting an outline ready...")):
-        steps = get_steps(prompt, LANG_OPTIONS[selection])
-    steps = edit_steps(steps)
+        recipe = init_recipe(prompt, LANG_OPTIONS[selection])
+    recipe = edit_steps(recipe)
 
     with loading_animation(Simple("processing instructions...")):
-        recipe = init_recipe(prompt, steps, LANG_OPTIONS[selection])
+        recipe = get_recipe_execution(recipe, LANG_OPTIONS[selection])
 
     executor = TerraformExecutor(recipe, input("enter a relative directory to store the terraform in: "))
-    executor.run()
+    executor.run(regen=regenerate_recipe_execution)
     return
