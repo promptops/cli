@@ -65,7 +65,7 @@ def embedding_batch(cmds: List[str]) -> List[tuple[str, np.ndarray]]:
     return items
 
 
-def index_history(show_progress: bool = None):
+def index_history(show_progress: bool = None, max_history: int = 5000):
     progress = None
     if show_progress:
         from promptops.loading.progress import ProgressSpinner
@@ -74,7 +74,13 @@ def index_history(show_progress: bool = None):
         progress.increment(1)
 
     db = get_history_db()
-    prev_commands = get_shell().get_full_history()
+    if max_history > 0:
+        prev_commands = get_shell().get_recent_history(max_history + 1)
+    else:
+        prev_commands = get_shell().get_full_history()
+    has_more = len(prev_commands) > max_history > 0
+    if max_history > 0:
+        prev_commands = prev_commands[-max_history:]
 
     if show_progress:
         progress.increment(3)
@@ -94,7 +100,7 @@ def index_history(show_progress: bool = None):
     if len(delta) == 0:
         if show_progress:
             progress.set(100)
-        return
+        return has_more
 
     progress_inc = (100 - 6) // (len(delta) / batch_size)
 
@@ -108,6 +114,8 @@ def index_history(show_progress: bool = None):
 
     if show_progress:
         progress.set(100)
+
+    return has_more
 
 
 def update_history():
