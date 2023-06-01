@@ -5,6 +5,8 @@ from promptops import settings
 import os
 import uuid
 from functools import lru_cache
+
+from promptops.shells import get_shell
 from promptops.ui.prompts import confirm, EXIT, GO_BACK
 from promptops.ui import selections
 from prompt_toolkit import print_formatted_text
@@ -69,8 +71,23 @@ def config_flow() -> dict:
         from promptops.history import index_history
 
         set_index_history(True)
-        index_history(show_progress=True)
+        initial_batch = 5000
+        has_more = index_history(show_progress=True, max_history=initial_batch)
         config_selections["loaded_history"] = True
+        if has_more:
+            print()
+            all_history = get_shell().get_full_history()
+            print_formatted_text(
+                HTML(
+                    f"  📖 we've indexed your last {initial_batch} commands, but there's {len(all_history) - initial_batch} more!"
+                )
+            )
+            print()
+            options = ["continue", "skip for now"]
+            ui = selections.UI(options, is_loading=False)
+            selection = ui.input()
+            if selection != 1:
+                index_history(show_progress=True, max_history=0)
 
     print()
     while True:
