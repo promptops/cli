@@ -84,7 +84,7 @@ def run(cmd: Result) -> (int, Optional[str]):
 def corrections_search(embedding):
     db = corrections.get_db()
     similar = db.search(embedding, k=3, min_similarity=0.8)
-    return [(corrections.QATuple.from_dict(s), score) for s, score in similar]
+    return list(filter(lambda c: c[0].corrected is not None, [(corrections.QATuple.from_dict(s), score) for s, score in similar]))
 
 
 def search_indexed_fragments(embedding, current_dir: str) -> list[index_store.SearchResult]:
@@ -396,7 +396,7 @@ def do_query(question: str):
         feedback({"event": "cancelled"})
         sys.exit(1)
 
-    if cmd.script != confirmed or len(questions) > 1:
+    if (cmd.script != confirmed or len(questions) > 1) and confirmed:
         # the user corrected the script
         db = corrections.get_db()
         q = "\n".join(questions)
