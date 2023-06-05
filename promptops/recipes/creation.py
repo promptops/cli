@@ -50,7 +50,7 @@ def get_recipe_execution(recipe: dict, language: str):
     req = {
         "trace_id": trace.trace_id,
         "id": recipe['id'],
-        "parameters": recipe['parameters'],
+        "steps": recipe['steps'],
     }
     if language == LANG_SHELL:
         req['shell'] = os.environ.get('SHELL')
@@ -156,6 +156,7 @@ def print_steps(steps):
 
 def edit_steps(recipe):
     steps = recipe.get('steps', [])
+    og = steps
     print("Based on your requirements, I've set the project outline to include the following steps ")
     print_steps(steps)
 
@@ -170,8 +171,6 @@ def edit_steps(recipe):
             recipe['steps'] = edited.split("\n")
             steps = recipe['steps']
             print_steps(steps)
-
-            # TODO: Save the edited steps through the API
         elif selection == 1:
             print()
             clarification = input("add details: ").strip()
@@ -182,7 +181,31 @@ def edit_steps(recipe):
             print("Based on your requirements & clarification, I've set the project outline to include the following steps ")
             print_steps(steps)
 
+    if og != recipe.get('steps'):
+        save_steps(recipe)
+
     return recipe
+
+
+def save_steps(recipe):
+    print()
+    req = {
+        'id': recipe.get('id'),
+        'trace_id': trace.trace_id,
+        'steps': recipe.get('steps')
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/steps",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        }
+    )
+
+    if response.status_code != 200:
+        print("error", response.json())
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
 
 
 def save_flow(recipe):
