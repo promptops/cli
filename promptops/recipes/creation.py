@@ -8,6 +8,7 @@ import sys
 from promptops import settings
 from promptops import trace
 from promptops import user
+from promptops.feedback import feedback
 from promptops.loading import loading_animation, Simple
 from promptops.recipes.terraform import TerraformExecutor
 from promptops.ui import selections
@@ -23,7 +24,6 @@ def regenerate_recipe_execution(recipe, clarification):
     req = {
         "trace_id": trace.trace_id,
         "id": recipe['id'],
-        "parameters": recipe['parameters'],
         "clarification": clarification
     }
 
@@ -38,24 +38,14 @@ def regenerate_recipe_execution(recipe, clarification):
         print(response.json())
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    data = response.json()
-
-    if not data.get("steps"):
-        raise Exception(f"missing steps")
-
-    return data
+    return response.json()
 
 
-def get_recipe_execution(recipe: dict, language: str):
+def get_recipe_execution(recipe: dict):
     req = {
         "trace_id": trace.trace_id,
         "id": recipe['id'],
-        "steps": recipe['steps'],
     }
-    if language == LANG_SHELL:
-        req['shell'] = os.environ.get('SHELL')
-    else:
-        req['language'] = language
 
     response = requests.post(
         settings.endpoint + "/recipe/execution",
@@ -65,15 +55,9 @@ def get_recipe_execution(recipe: dict, language: str):
         },
     )
     if response.status_code != 200:
-        print(response.json())
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    data = response.json()
-
-    if not data.get("steps"):
-        raise Exception(f"missing steps")
-
-    return data
+    return response.json()
 
 
 def clarify_steps(recipe, clarification):
@@ -92,12 +76,7 @@ def clarify_steps(recipe, clarification):
     if response.status_code != 200:
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    data = response.json()
-
-    if not data.get("steps"):
-        raise Exception(f"missing steps")
-
-    return data
+    return response.json()
 
 
 def init_recipe(prompt: str, language: str, workflow_id=None):
@@ -124,12 +103,7 @@ def init_recipe(prompt: str, language: str, workflow_id=None):
     if response.status_code != 200:
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    data = response.json()
-
-    if not data.get("steps"):
-        raise Exception(f"missing steps")
-
-    return data
+    return response.json()
 
 
 def run(script: str, lang: str = "shell") -> (int, Optional[str]):
@@ -233,16 +207,20 @@ def save_flow(recipe):
 
 
 def list_workflows():
-    response = requests.get(settings.endpoint + "/recipe/", headers={
+    response = requests.get(settings.endpoint + f"/recipe?trace_id={trace.trace_id}", headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
     })
 
-    return response.json().get('recipes')
+    if response.status_code != 200:
+        print("error", response.json(), "code", response.status_code)
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    return response.json().get('recipes', [])
 
 
 def available_workflows():
     recipes = list_workflows()
-    if len(recipes) == 0:
+    if not recipes or len(recipes) == 0:
         print("You don't have any saved workflows. To create a workflow try 'um workflow prompt'")
         return None
 
@@ -270,7 +248,7 @@ def available_workflows():
 
 def workflow_entrypoint(args):
     new_recipe = True
-    if not args.question or len(args.question) < 1:
+    if not args or len(args.question) < 1:
         new_recipe = False
         recipe = available_workflows()
         if not recipe:
@@ -290,10 +268,12 @@ def workflow_entrypoint(args):
         recipe = edit_steps(recipe)
 
         with loading_animation(Simple("processing instructions...")):
-            recipe = get_recipe_execution(recipe, LANG_OPTIONS[selection])
+            recipe = get_recipe_execution(recipe)
 
+    print("Great! We are just about ready to run, just a few more questions: ")
     executor = TerraformExecutor(recipe)
-    executor.run(regen=regenerate_recipe_execution)
+    result = executor.run(regen=regenerate_recipe_execution)
+    feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
 
     if new_recipe:
         print()

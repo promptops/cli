@@ -62,7 +62,7 @@ Provide more context flow
 create virtual env
 
 ```shell
-python3 -m venv ./venv
+python3.10 -m venv ./venv
 . ./venv/bin/activate
 ```
 
