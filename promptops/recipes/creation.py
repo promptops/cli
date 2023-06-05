@@ -1,4 +1,3 @@
-import logging
 import os
 import subprocess
 from typing import Optional
@@ -9,38 +8,105 @@ import sys
 from promptops import settings
 from promptops import trace
 from promptops import user
+from promptops.feedback import feedback
+from promptops.loading import loading_animation, Simple
+from promptops.recipes.terraform import TerraformExecutor
 from promptops.ui import selections
+from promptops.ui.input import non_empty_input
+from promptops.ui.vim import edit_with_vim
+
+LANG_SHELL = 'shell'
+LANG_TF = 'terraform'
+LANG_OPTIONS = [LANG_TF, LANG_SHELL]
 
 
-def init_recipe(
-    q: str,
-):
+def regenerate_recipe_execution(recipe, clarification):
     req = {
-        "prompt": q,
         "trace_id": trace.trace_id,
-        "platform": sys.platform,
-        "shell": os.environ.get("SHELL"),
+        "id": recipe['id'],
+        "clarification": clarification
     }
+
     response = requests.post(
-        settings.endpoint + "/recipe",
+        settings.endpoint + "/recipe/regenerate",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
         },
     )
     if response.status_code != 200:
-        # this exception completely destroys the ui
+        print(response.json())
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    data = response.json()
-
-    if not data.get("steps"):
-        raise Exception(f"missing steps")
-
-    return data
+    return response.json()
 
 
-def run(script: str, lang: str="shell") -> (int, Optional[str]):
+def get_recipe_execution(recipe: dict):
+    req = {
+        "trace_id": trace.trace_id,
+        "id": recipe['id'],
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/execution",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
+    if response.status_code != 200:
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    return response.json()
+
+
+def clarify_steps(recipe, clarification):
+    req = {
+        "id": recipe['id'],
+        "trace_id": trace.trace_id,
+        "clarification": clarification,
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/clarify",
+        json=req,
+        headers={"user-agent": f"promptops-cli; user_id={user.user_id()}"}
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    return response.json()
+
+
+def init_recipe(prompt: str, language: str, workflow_id=None):
+    req = {
+        "prompt": prompt,
+        "trace_id": trace.trace_id,
+        "platform": sys.platform,
+        "language": language,
+        "author": user.user_id(),
+        "recipe_id": workflow_id,
+    }
+
+    if language == LANG_SHELL:
+        req['shell'] = os.environ.get("SHELL")
+
+    response = requests.post(
+        settings.endpoint + "/recipe/init",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    return response.json()
+
+
+def run(script: str, lang: str = "shell") -> (int, Optional[str]):
     if lang == "shell":
         proc = subprocess.run(
             script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -51,116 +117,172 @@ def run(script: str, lang: str="shell") -> (int, Optional[str]):
             sys.stdout.write(proc.stderr.decode("utf-8"))
         sys.stdout.flush()
 
-        # history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), proc.returncode)
         return proc.returncode, str(proc.stderr)
     else:
         raise NotImplementedError(f"{lang} not implemented yet")
 
 
-def execute_step(step):
-    print(f"executing step \n command: {step.get('command')}")
+def print_steps(steps):
+    for i, step in enumerate(steps):
+        print(f"{i + 1}. {step}")
     print()
 
-    for parameter in step.get("parameters"):
-        print(f"parameter: {parameter.get('name')}")
-        options = ["describe"]
 
-        if parameter.get("resolve"):
-            options.append("resolve")
-        if parameter.get("create"):
-            options.append("create")
-        if parameter.get("options"):
-            options.append("select")
-        options.append("replace")
+def edit_steps(recipe):
+    steps = recipe.get('steps', [])
+    og = steps
+    print("Based on your requirements, I've set the project outline to include the following steps ")
+    print_steps(steps)
+
+    options = ["edit in vim", "clarify", "continue"]
+    selection = None
+    while selection != 2:
         ui = selections.UI(options, is_loading=False)
         selection = ui.input()
+        print()
+        if selection == 0:
+            edited = edit_with_vim("\n".join(steps))
+            recipe['steps'] = edited.split("\n")
+            steps = recipe['steps']
+            print_steps(steps)
+        elif selection == 1:
+            print()
+            clarification = input("add details: ").strip()
+            with loading_animation(Simple("weaving in your clarification...")):
+                recipe = clarify_steps(recipe, clarification)
+            steps = recipe.get('steps')
+            print()
+            print("Based on your requirements & clarification, I've set the project outline to include the following steps ")
+            print_steps(steps)
 
-        option = options[selection]
+    if og != recipe.get('steps'):
+        save_steps(recipe)
 
-        if option == "resolve" or option == "create":
-            result = run(parameter.get(option))
-        if option == "options":
-            select_ui = selections.UI(parameter.get("options"), is_loading=False)
-            selected_option = select_ui.input()
-            print(selected_option)
-        if options == "replace":
-            value = input("enter a value for the parameter: ")
+    return recipe
 
 
-
-def workflow_entrypoint(prompt):
-    if not prompt.question or len(prompt.question) < 1:
-        print("you must include a question")
-        return
-
-    # recipe = init_recipe(prompt)
-
-    recipe = {
-        "name": "Provide a name",
-        "description": "Provide a description",
-        "steps": [
-            {
-                "command": "aws iam create-role --role-name <lambda-role-name> --assume-role-policy-document file://<path-to-trust-policy-json-file>",
-                "parameters": [
-                    {
-                        "name": "lambda-role-name",
-                        "description": "name of the Lambda role",
-                        "resolve": "aws iam list-roles --query 'Roles[].RoleName' --output text"
-                    },
-                    {
-                        "name": "path-to-trust-policy-json-file",
-                        "description": "local file path for trust policy document",
-                        "create": "echo '{\n            \"Version\": \"2012-10-17\",\n            \"Statement\": [\n            {\n            \"Effect\": \"Allow\",\n            \"Principal\": {\n            \"Service\": \"lambda.amazonaws.com\"\n            },\n            \"Action\": \"sts:AssumeRole\"\n            }\n            ]\n            }' > trust-policy.json"
-                    }
-                ]
-            },
-            {
-                "command": "aws iam attach-role-policy --role-name <lambda-role-name> --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-                "parameters": [
-                    {
-                        "name": "lambda-role-name",
-                        "description": "name of the Lambda execution role",
-                        "resolve": "aws iam list-roles --query 'Roles[].RoleName' --output text"
-                    },
-                    {
-                        "name": "policy-arn",
-                        "description": "ARN of the AWSLambdaBasicExecutionRole policy",
-                        "resolve": "aws iam list-policies --scope AWS --query 'Policies[?PolicyName==`AWSLambdaBasicExecutionRole`].Arn' --output text"
-                    }
-                ]
-            },
-            {
-                "command": "aws lambda create-function --function-name <lambda-function-name> --runtime <runtime> --role <lambda-role-arn> --handler <handler> --zip-file fileb://<path-to-zip-file>",
-                "parameters": [
-                    {
-                        "name": "<lambda-function-name>",
-                        "description": "name of the Lambda function",
-                        "resolve": "aws lambda list-functions --query 'Functions[].FunctionName' --output text"
-                    },
-                    {
-                        "name": "<runtime>",
-                        "description": "runtime environment for the Lambda function"
-                    },
-                    {
-                        "name": "<lambda-role-arn>",
-                        "description": "ARN of the IAM role that Lambda assumes when it executes the function",
-                        "resolve": "aws iam list-roles --query 'Roles[?RoleName==`<lambda-role-name>`].Arn' --output text"
-                    },
-                    {
-                        "name": "<handler>",
-                        "description": "entry point of the Lambda function"
-                    },
-                    {
-                        "name": "<path-to-zip-file>",
-                        "description": "local file path for the ZIP file containing the Lambda function code",
-                        "create": "zip -r <zip-file-name> <source-code-directory>"
-                    }
-                ]
-            }
-        ]
+def save_steps(recipe):
+    print()
+    req = {
+        'id': recipe.get('id'),
+        'trace_id': trace.trace_id,
+        'steps': recipe.get('steps')
     }
 
-    for step in recipe.get("steps"):
-        execute_step(step)
+    response = requests.post(
+        settings.endpoint + "/recipe/steps",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        }
+    )
 
-    return
+    if response.status_code != 200:
+        print("error", response.json())
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+
+def save_flow(recipe):
+    print()
+    req = {
+        'id': recipe.get('id'),
+        'trace_id': trace.trace_id,
+        'name': non_empty_input("Enter a name for the saved workflow: "),
+        'description': non_empty_input("Enter a brief description: "),
+        'parameters': recipe.get('parameters'),
+        'execution': recipe.get('execution')
+    }
+
+    response = requests.post(
+        settings.endpoint + "/recipe/save",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        }
+    )
+
+    if response.status_code != 200:
+        print("error", response.json())
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+
+def list_workflows():
+    response = requests.get(settings.endpoint + f"/recipe?trace_id={trace.trace_id}", headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+    })
+
+    if response.status_code != 200:
+        print("error", response.json(), "code", response.status_code)
+        raise Exception(f"there was problem with the response, status: {response.status_code}")
+
+    return response.json().get('recipes', [])
+
+
+def available_workflows():
+    recipes = list_workflows()
+    if not recipes or len(recipes) == 0:
+        print("You don't have any saved workflows. To create a workflow try 'um workflow prompt'")
+        return None
+
+    print("Available Workflows")
+    names = [p.get('name') for p in recipes]
+    selected = None
+    while not selected:
+        ui = selections.UI(names, is_loading=False)
+        recipe_selection = ui.input()
+        print()
+
+        selection = 1
+        while selection == 1:
+            ui = selections.UI(['select', 'describe', 'go back'], is_loading=False)
+            selection = ui.input()
+            if selection == 0:
+                selected = recipes[recipe_selection]
+                print()
+            elif selection == 1:
+                print()
+                describe = recipes[recipe_selection]
+                print(f"Description: {describe.get('description')} - {describe.get('language')}")
+    return selected
+
+
+def workflow_entrypoint(args):
+    new_recipe = True
+    if not args or len(args.question) < 1:
+        new_recipe = False
+        recipe = available_workflows()
+        if not recipe:
+            return
+        recipe = init_recipe(recipe['prompt'], recipe['language'], recipe['id'])
+    else:
+        prompt = " ".join(args.question)
+
+        print("Workflows are currently based on Terraform. Support for more methods coming soon.\n")
+        # ui = selections.UI(LANG_OPTIONS, is_loading=False)
+        # selection = ui.input()
+        # print()
+        selection = 0
+
+        with loading_animation(Simple("getting an outline ready...")):
+            recipe = init_recipe(prompt, LANG_OPTIONS[selection])
+        recipe = edit_steps(recipe)
+
+        with loading_animation(Simple("processing instructions...")):
+            recipe = get_recipe_execution(recipe)
+
+    print("Great! We are just about ready to run, just a few more questions: ")
+    executor = TerraformExecutor(recipe)
+    result = executor.run(regen=regenerate_recipe_execution)
+    feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
+
+    if new_recipe:
+        print()
+        print("Would you like to save this as a reusable workflow?")
+        print()
+        ui = selections.UI(["save", "exit"], is_loading=False)
+        selection = ui.input()
+        if selection == 0:
+            save_flow(recipe)
+            print()
+            print("To use this workflow, simply type 'um workflow' without any prompt")
+        print()

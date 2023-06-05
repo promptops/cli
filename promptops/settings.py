@@ -1,6 +1,5 @@
 DEFAULT_ENDPOINT = "https://cli.promptops.com"
 
-
 endpoint: str = DEFAULT_ENDPOINT
 request_explanation: bool = True
 model: str = "accurate"
