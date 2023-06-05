@@ -29,6 +29,7 @@ from promptops import settings_store
 from promptops import scrub_secrets
 from promptops import shells
 from promptops.index import index_store
+from promptops import gitaware
 from .dtos import Result
 from .explanation import get_explanation, ReturningThread
 from . import messages
@@ -146,7 +147,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
 
     relevant_indexed_data = search_indexed_fragments(embedding, os.getcwd())
     if len(relevant_indexed_data) > 0:
-        print("found information that might be relevant to your question in:")
+        print("  found information that might be relevant to your question in:")
         printed = set()
         for r in relevant_indexed_data:
             if r.item.item_location in printed:
@@ -351,6 +352,10 @@ def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
 
 
 def do_query(question: str):
+    if git_root := gitaware.git_root():
+        from .git_repo import offer_to_index
+        offer_to_index(git_root)
+
     question = question.strip()
     if question == "":
         feedback({"event": "empty-initial-query"})
