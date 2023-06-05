@@ -13,12 +13,15 @@ class Step:
 
 
 class TerraformExecutor:
-    def __init__(self, recipe, directory):
-        print(recipe)
+    def __init__(self, recipe):
         self.recipe = recipe
         self.execution_steps = [Step(i.get('file'), i.get('content')) for i in recipe.get('execution')]
         self.parameters = recipe.get('parameters')
-        directory = directory.strip()
+
+        directory = input("enter a relative directory to store the terraform in: ").strip()
+        while directory == "":
+            directory = input("enter a relative directory to store the terraform in: ").strip()
+
         directory = directory if directory[0] != "/" else directory[1:]
         directory = directory if directory[-1] == "/" else directory + "/"
         self.directory = os.path.expanduser(directory)
@@ -46,8 +49,10 @@ class TerraformExecutor:
                 break
             elif selection == 1:
                 # todo: Create a cache of parameter values before regenerating!
+                print()
+                clarify = input("Provide more clarification (optional): ")
                 with loading_animation(Simple("regenerating terraform files...")):
-                    self.recipe = regen(self.recipe, input("Provide more clarification (optional): "))
+                    self.recipe = regen(self.recipe, clarify)
                 self.execution_steps = [Step(i.get('file'), i.get('content')) for i in self.recipe.get('execution')]
                 self.parameters = self.recipe.get('parameters')
                 self.clean()
@@ -87,12 +92,12 @@ class TerraformExecutor:
                                 break
                             value.append(options[selection])
             else:
-                value = input(f"enter value for {parameter.get('parameter')}: ").strip()
+                value = input(parameter.get('description').strip() + " ")
                 inp = None
                 while parameter.get('type') == "list" and inp != "":
                     if type(value) is str:
                         value = [value]
-                    inp = input(f"enter value for {parameter.get('parameter')} or nothing to continue: ").strip()
+                    inp = input(f"enter additional values for {parameter.get('parameter')} or nothing to continue: ").strip()
                     value.append(inp)
 
             parameter['value'] = value
@@ -105,13 +110,11 @@ class TerraformExecutor:
                 open(self.directory + step.file, 'w').close()
             for parameter in self.parameters:
                 if parameter['parameter'] in step.content:
-                    if parameter['type'] == "int":
-                        value = parameter['value']
-                    elif parameter['type'] == "list":
+                    if parameter['type'] == "list":
                         items = [f'"{i}"' for i in parameter['value']]
                         value = f"[{' ,'.join(items)}]"
                     else:
-                        value = f"\"{parameter['value']}\""
+                        value = f"{parameter['value']}"
 
                     var_name = f"<{parameter['parameter']}>"
                     step.content = step.content.replace(var_name, value)
