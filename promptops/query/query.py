@@ -46,19 +46,38 @@ def deduplicate(results: list[Result]):
     return final_results
 
 
+def printer(pipe, func):
+    for line in iter(pipe.readline, b''):
+        line_decoded = line.decode().strip()
+        sys.stdout.write(line_decoded)
+        sys.stdout.flush()
+        func(line)
+    pipe.close()
+
+
 def run(cmd: Result) -> (int, Optional[str]):
     if cmd.lang == "shell":
-        proc = subprocess.run(
+        process = subprocess.Popen(
             cmd.script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        if proc.stdout and len(proc.stdout) > 0:
-            sys.stdout.write(proc.stdout.decode("utf-8"))
-        if proc.stderr and len(proc.stderr) > 0:
-            sys.stdout.write(proc.stderr.decode("utf-8"))
+        stdout = []
+        stderr = []
+
+        thread_out = threading.Thread(target=printer, args=[process.stdout, lambda line: stdout.append(line.decode().strip())])
+        thread_err = threading.Thread(target=printer, args=[process.stderr, lambda line: stderr.append(line.decode().strip())])
+
+        thread_out.start()
+        thread_err.start()
+        thread_out.join()
+        thread_err.join()
+
+        sys.stdout.write("\n")
         sys.stdout.flush()
 
-        history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), proc.returncode)
-        return proc.returncode, proc.stderr.decode("utf-8")
+        process.wait()
+
+        history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), process.returncode)
+        return process.returncode, "".join(stderr)
     else:
         raise NotImplementedError(f"{cmd.lang} not implemented yet")
 
@@ -303,7 +322,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
 
 def correction_loop(prompt: str, command: str, error: str) -> Optional[Result]:
     selected = prompts.confirm(
-        f"looks like the command failed (return code was not 0), would you like us to attempt to fix it?"
+        f"It looks like the command failed, would you like us to attempt to fix it using the stderr output?"
     )
     if selected == prompts.GO_BACK:
         return None
@@ -395,14 +414,14 @@ def do_query(question: str):
     feedback({"event": "run"})
     revised_cmd = copy(cmd)
     revised_cmd.script = confirmed
-    rc, stdout = run(revised_cmd)
+    rc, stderr = run(revised_cmd)
     feedback({"event": "finished", "rc": rc})
 
     while rc != 0:
-        corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stdout)
+        corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stderr)
         if not corrected_cmd:
             return
-        rc, stdout = run(corrected_cmd)
+        rc, stderr = run(corrected_cmd)
         if rc == 0:
             db = corrections.get_db()
             q = "\n".join(questions)
