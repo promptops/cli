@@ -132,7 +132,11 @@ def entry_alias():
         from promptops import history
 
         history.update_history()
-    query.query_mode(args)
+
+    if args.question and len(args.question) > 0 and args.question[0] == 'workflow':
+        workflow_entrypoint(args)
+    else:
+        query.query_mode(args)
 
 
 def entry_main():
