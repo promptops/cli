@@ -12,7 +12,7 @@
 
 # Installation
 
-## Ubuntu Linux 
+## Ubuntu Linux / Mac
 ```shell
 curl -fsSL -o ubuntu-installer.sh https://raw.githubusercontent.com/promptops/cli/main/ubuntu-installer.sh
 chmod 700 ubuntu-installer.sh

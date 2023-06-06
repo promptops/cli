@@ -13,6 +13,7 @@ from promptops.loading import loading_animation, Simple
 from promptops.recipes.terraform import TerraformExecutor
 from promptops.ui import selections
 from promptops.ui.input import non_empty_input
+from promptops.ui.prompts import confirm, GO_BACK
 from promptops.ui.vim import edit_with_vim
 
 LANG_SHELL = 'shell'
@@ -141,7 +142,7 @@ def edit_steps(recipe):
         selection = ui.input()
         print()
         if selection == 0:
-            edited = edit_with_vim("\n".join(steps))
+            edited = edit_with_vim("\n".join([s for s in steps if s.strip() != ""]))
             recipe['steps'] = edited.split("\n")
             steps = recipe['steps']
             print_steps(steps)
@@ -188,7 +189,6 @@ def save_flow(recipe):
         'id': recipe.get('id'),
         'trace_id': trace.trace_id,
         'name': non_empty_input("Enter a name for the saved workflow: "),
-        'description': non_empty_input("Enter a brief description: "),
         'parameters': recipe.get('parameters'),
         'execution': recipe.get('execution')
     }
@@ -221,10 +221,10 @@ def list_workflows():
 def available_workflows():
     recipes = list_workflows()
     if not recipes or len(recipes) == 0:
-        print("You don't have any saved workflows. To create a workflow try 'um workflow prompt'")
+        print("You don't have any saved workflows. To create a workflow try 'um workflow <prompt>'")
         return None
 
-    print("Available Workflows")
+    print("Select from available workflows: ")
     names = [p.get('name') for p in recipes]
     selected = None
     while not selected:
@@ -232,17 +232,12 @@ def available_workflows():
         recipe_selection = ui.input()
         print()
 
-        selection = 1
-        while selection == 1:
-            ui = selections.UI(['select', 'describe', 'go back'], is_loading=False)
-            selection = ui.input()
-            if selection == 0:
-                selected = recipes[recipe_selection]
-                print()
-            elif selection == 1:
-                print()
-                describe = recipes[recipe_selection]
-                print(f"Description: {describe.get('description')} - {describe.get('language')}")
+        print(f"{names[recipe_selection]}: {recipes[recipe_selection].get('prompt')}")
+        confirmed = confirm("Use this workflow?")
+        if confirmed != GO_BACK:
+            selected = recipes[recipe_selection]
+        else:
+            print("\nSelect from available workflows: ")
     return selected
 
 
@@ -270,7 +265,6 @@ def workflow_entrypoint(args):
         with loading_animation(Simple("processing instructions...")):
             recipe = get_recipe_execution(recipe)
 
-    print("Great! We are just about ready to run, just a few more questions: ")
     executor = TerraformExecutor(recipe)
     result = executor.run(regen=regenerate_recipe_execution)
     feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
@@ -284,5 +278,5 @@ def workflow_entrypoint(args):
         if selection == 0:
             save_flow(recipe)
             print()
-            print("To use this workflow, simply type 'um workflow' without any prompt")
+            print("To use a saved workflow, simply type 'um workflow'")
         print()

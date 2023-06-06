@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from promptops.loading import loading_animation, Simple
 from promptops.ui import selections
+from promptops.ui.input import non_empty_input
 
 
 @dataclass
@@ -18,10 +19,7 @@ class TerraformExecutor:
         self.execution_steps = [Step(i.get('file'), i.get('content')) for i in recipe.get('execution')]
         self.parameters = recipe.get('parameters')
 
-        directory = input("enter a relative directory to store the terraform in: ").strip()
-        while directory == "":
-            directory = input("enter a relative directory to store the terraform in: ").strip()
-
+        directory = non_empty_input("enter a relative directory to store the terraform module in: ").strip()
         directory = directory if directory[0] != "/" else directory[1:]
         directory = directory if directory[-1] == "/" else directory + "/"
         self.directory = os.path.expanduser(directory)
