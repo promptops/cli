@@ -12,13 +12,6 @@
 
 # Installation
 
-## Ubuntu Linux / Mac
-```shell
-curl -fsSL -o ubuntu-installer.sh https://raw.githubusercontent.com/promptops/cli/main/ubuntu-installer.sh
-chmod 700 ubuntu-installer.sh
-./ubuntu-installer.sh
-```
-
 ## pip 
 
 Make sure you have python 3.10 or more recent
