@@ -7,6 +7,7 @@ from promptops.loading.context import loading_animation
 from promptops.loading.simple import Simple
 from promptops.index import index_store, content
 from promptops import settings
+from promptops import feedback
 
 
 def _is_processed(git_root):
@@ -48,9 +49,11 @@ def offer_to_index(git_root):
         return
 
     print("  👀 detected git repository at", git_root)
+    feedback.feedback({"event": "git_repo_detected"})
     with loading_animation(Simple("checking for README files... [ctrl+c] cancel")):
         files = _discover_indexable_files(git_root)
     _set_processed(git_root)
+    feedback.feedback({"event": "indexable_files", "count": len(files)})
     if len(files) == 0:
         return
     print("  use the following files to help answer questions about this repository?")
@@ -88,6 +91,7 @@ def offer_to_index(git_root):
         ui.reset_options(make_file_options() + global_options, is_loading=False)
         ui._is_active = False
 
+    feedback.feedback({"event": "indexable_files_selected", "total": len(files), "selected": sum(selected)})
     print()
 
     store = index_store.IndexStore(os.path.expanduser(settings.user_index_root))
