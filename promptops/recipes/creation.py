@@ -242,41 +242,44 @@ def available_workflows():
 
 
 def workflow_entrypoint(args):
-    new_recipe = True
-    if not args or len(args.question) < 1:
-        new_recipe = False
-        recipe = available_workflows()
-        if not recipe:
-            return
-        recipe = init_recipe(recipe['prompt'], recipe['language'], recipe['id'])
-    else:
-        prompt = " ".join(args.question)
+    try:
+        new_recipe = True
+        if not args or len(args.question) < 2:
+            new_recipe = False
+            recipe = available_workflows()
+            if not recipe:
+                return
+            recipe = init_recipe(recipe['prompt'], recipe['language'], recipe['id'])
+        else:
+            prompt = " ".join(args.question[1:])
 
-        print("Workflows are currently based on Terraform. Support for more methods coming soon.\n")
-        # ui = selections.UI(LANG_OPTIONS, is_loading=False)
-        # selection = ui.input()
-        # print()
-        selection = 0
+            print("Workflows are currently based on Terraform. Support for more methods coming soon.\n")
+            # ui = selections.UI(LANG_OPTIONS, is_loading=False)
+            # selection = ui.input()
+            # print()
+            selection = 0
 
-        with loading_animation(Simple("getting an outline ready...")):
-            recipe = init_recipe(prompt, LANG_OPTIONS[selection])
-        recipe = edit_steps(recipe)
+            with loading_animation(Simple("getting an outline ready...")):
+                recipe = init_recipe(prompt, LANG_OPTIONS[selection])
+            recipe = edit_steps(recipe)
 
-        with loading_animation(Simple("processing instructions...")):
-            recipe = get_recipe_execution(recipe)
+            with loading_animation(Simple("generating files, please be patient as this can take several minutes...")):
+                recipe = get_recipe_execution(recipe)
 
-    executor = TerraformExecutor(recipe)
-    result = executor.run(regen=regenerate_recipe_execution)
-    feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
+        executor = TerraformExecutor(recipe)
+        result = executor.run(regen=regenerate_recipe_execution)
+        feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
 
-    if new_recipe:
-        print()
-        print("Would you like to save this as a reusable workflow?")
-        print()
-        ui = selections.UI(["save", "exit"], is_loading=False)
-        selection = ui.input()
-        if selection == 0:
-            save_flow(recipe)
+        if new_recipe:
             print()
-            print("To use a saved workflow, simply type 'um workflow'")
-        print()
+            print("Would you like to save this as a reusable workflow?")
+            print()
+            ui = selections.UI(["save", "exit"], is_loading=False)
+            selection = ui.input()
+            if selection == 0:
+                save_flow(recipe)
+                print()
+                print("To use a saved workflow, simply type 'um workflow'")
+            print()
+    except KeyboardInterrupt:
+        pass

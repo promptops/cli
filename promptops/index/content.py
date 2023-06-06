@@ -3,6 +3,7 @@ import mimetypes
 import datetime
 import logging
 import os
+from typing import Union, Optional
 
 import numpy as np
 import requests
@@ -17,7 +18,7 @@ from promptops.similarity import VectorDB
 from .index_store import ItemMetadata
 
 
-def index_content(content: str | bytes, content_type: str) -> VectorDB:
+def index_content(content: Union[str, bytes], content_type: str) -> VectorDB:
     response = requests.post(
         settings.endpoint + "/index_data?trace_id=" + trace_id,
         headers={
@@ -32,7 +33,7 @@ def index_content(content: str | bytes, content_type: str) -> VectorDB:
     db = VectorDB()
     buffer = b""
     chunk_size = 1024
-    spinner: ProgressSpinner = None
+    spinner: Optional[ProgressSpinner] = None
     for chunk in response.iter_content(chunk_size=chunk_size):
         buffer += chunk
         try:
