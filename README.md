@@ -7,23 +7,31 @@
 - find the right command without leaving the terminal
 - `um` can index your history to find commands you've run before
 - `um` instantly learns from your corrections
+- `um workflow` can help you provision infrastructure
 - simple interface to clarify your question or provide more context
-- free to use
 
 # Installation
+
+## Linux - Ubuntu
+```shell
+curl -fsSL -o ubuntu-installer.sh https://raw.githubusercontent.com/promptops/cli/main/ubuntu-installer.sh
+chmod 700 ubuntu-installer.sh
+./ubuntu-installer.sh
+```
+
+## MacOS - Homebrew
+
+```shell
+brew install promptops/promptops/promptops-cli
+```
 
 ## pip 
 
 Make sure you have python 3.10 or more recent
+[python.org downloads](https://www.python.org/downloads/)
 
 ```shell
 pip3 install promptops
-```
-
-## homebrew (MacOS only)
-
-```shell
-brew install promptops/promptops/promptops-cli
 ```
 
 # Usage
@@ -32,6 +40,10 @@ brew install promptops/promptops/promptops-cli
 
 ```shell
 um <question>
+```
+
+```shell
+um workflow <multi-stepped-prompt>
 ```
 
 ## local runner
