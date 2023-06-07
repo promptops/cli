@@ -1,6 +1,7 @@
 import copy
 import math
 import sys
+import os
 
 from promptops.ui.selections import UI, FOOTER_SECTIONS
 import colorama
@@ -148,7 +149,18 @@ def update_async_simple():
         print("You said: ", confirmed)
 
 
+def scroll():
+    size = os.get_terminal_size()
+    print("size", size)
+    input("press enter to continue")
+    options = [f"option-{i}" for i in range(100)]
+    ui = UI(options=options, is_loading=True, header="hello world")
+    selected = ui.input()
+    print("selected", selected)
+
+
 if __name__ == "__main__":
     # stream_async()
     # update_async_simple()
-    remove_text()
+    # remove_text()
+    scroll()

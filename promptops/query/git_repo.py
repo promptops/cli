@@ -62,8 +62,6 @@ def offer_to_index(git_root):
     feedback.feedback({"event": "indexable_files", "count": len(files)})
     if len(files) == 0:
         return
-    print("  use the following files to help answer questions about this repository?")
-    print()
     selected = [False] * len(files)
 
     def make_file_options():
@@ -79,13 +77,19 @@ def offer_to_index(git_root):
     global_options = ["Accept all", "Reject all"]
     all_options = make_file_options() + global_options
 
-    ui = selections.UI(all_options, is_loading=False, actions={
-        " ": lambda _, ui: toggle_selection(ui.selected),
-    }, footer=" ".join([
-        selections.FOOTER_SECTIONS["select"],
-        f"{colorama.Style.BRIGHT}[space]{colorama.Style.RESET_ALL} toggle",
-        selections.FOOTER_SECTIONS["confirm"],
-        selections.FOOTER_SECTIONS["cancel"]])
+    ui = selections.UI(
+        all_options,
+        is_loading=False,
+        actions={
+            " ": lambda _, ui: toggle_selection(ui.selected),
+        },
+        header="  use the following files to help answer questions about this repository?",
+        footer=" ".join([
+            selections.FOOTER_SECTIONS["select"],
+            f"{colorama.Style.BRIGHT}[space]{colorama.Style.RESET_ALL} toggle",
+            selections.FOOTER_SECTIONS["confirm"],
+            selections.FOOTER_SECTIONS["cancel"]
+        ])
     )
     ui.select(len(files))  # default to Accept All
     index = ui.input()

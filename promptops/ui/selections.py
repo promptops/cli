@@ -27,6 +27,7 @@ class UI(object):
         loading_text="getting you the best results ...",
         footer=" ".join([FOOTER_SECTIONS["select"], FOOTER_SECTIONS["confirm"], FOOTER_SECTIONS["cancel"]]),
         actions: dict[str, typing.Callable[[str, "UI"], None]] = None,
+        header=""
     ):
         self._selected = 0
         self._options = options
@@ -34,6 +35,7 @@ class UI(object):
         self._start = time.time()
         self._cursor = cursor
         self._footer = footer
+        self._header = header
         self._loading_line_index = None
         self._option_indexes = []
         self._thread = threading.Thread(target=self._loading_animation, daemon=True)
@@ -46,6 +48,9 @@ class UI(object):
         self._lines_written = 0
         self._raw_mode = False
         self._old_stdin_attrs = None
+        self._offset = 0
+        self._estimated_lines = []
+        self._usable_lines = 0
         self.render()
         self._thread.start()
 
@@ -64,27 +69,47 @@ class UI(object):
 
             size = os.get_terminal_size()
             width = size.columns
+            height = size.lines
+            extra_lines = 0
+            if self._header:
+                extra_lines += 2
+            if self._is_loading:
+                extra_lines += 1
+            if self._footer:
+                extra_lines += 2
+            self._usable_lines = height - extra_lines
             self._option_indexes = []
 
             current_line = 0
+            if self._header:
+                sys.stdout.write(f"{self._header}\n\n")
+                current_line += 2
+            option_lines = 0
             for i, option in enumerate(self._options):
                 self._option_indexes.append(current_line)
                 if i == self._selected:
                     text = f" {self._cursor} {self._get_formatted_text(option, True)}"
                 else:
                     text = f"   {self._get_formatted_text(option, False)}"
-                sys.stdout.write(f"{text}\n")
+                estimated_lines = 0
                 for line in to_plain_text(ANSI(text)).split("\n"):
                     text_width = wcwidth.wcswidth(line)
-                    current_line += 1  # we always write at least one line
-                    current_line += text_width // width
+                    estimated_lines += 1  # we always write at least one line
+                    estimated_lines += text_width // width
+                self._estimated_lines.append(estimated_lines)
+                if i < self._offset:
+                    continue
+                option_lines += estimated_lines
+                if option_lines <= self._usable_lines:
+                    sys.stdout.write(f"{text}\n")
+                    current_line += estimated_lines
 
             if self._is_loading:
                 self._loading_line_index = current_line
                 if self._show_timer:
-                    sys.stdout.write(f"  {self._spinner(advance=False)} {(time.time() - self._start):.2f}s\n")
+                    sys.stdout.write(f"   {self._spinner(advance=False)} {(time.time() - self._start):.2f}s\n")
                 else:
-                    sys.stdout.write(f"  {self._spinner(advance=False)}\n")
+                    sys.stdout.write(f"   {self._spinner(advance=False)}\n")
                 current_line += 1
 
             if self._footer:
@@ -120,6 +145,21 @@ class UI(object):
             return
         if len(self._options) == 0:
             return
+        if index < self._offset:
+            self._offset = index
+            self._selected = index
+            self.render()
+            return
+        elif index > self._selected:
+            # check if we need to scroll down
+            new_offset = self._offset
+            while sum(self._estimated_lines[new_offset: index + 1]) > self._usable_lines:
+                new_offset += 1
+            if self._offset != new_offset:
+                self._offset = new_offset
+                self._selected = index
+                self.render()
+                return
         with self._lock:
             sys.stdout.write("\x1b7")
             sys.stdout.write(f"\x1b[{self._lines_written - self._option_indexes[index]}A")
