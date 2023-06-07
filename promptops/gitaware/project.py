@@ -12,7 +12,7 @@ def git_root():
 
 def is_ignored(path):
     try:
-        subprocess.check_output(["git", "check-ignore", path])
+        subprocess.check_output(["git", "check-ignore", path], stderr=subprocess.STDOUT)
         return True
     except subprocess.CalledProcessError as e:
         logging.debug("%s return code: %d", path, e.returncode)

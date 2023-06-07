@@ -35,7 +35,7 @@ def _discover_indexable_files(root, accept_file: typing.Callable[[str, str], boo
             if not accept_file(dirpath, filename) or gitaware.is_ignored(full_name):
                 continue
             files.append(full_name)
-        dirnames[:] = filter(lambda d: not gitaware.is_ignored(os.path.join(dirpath, d)) and d != ".git", dirnames)
+        dirnames[:] = filter(lambda d: d != ".git", dirnames)
     return files
 
 
@@ -51,7 +51,13 @@ def offer_to_index(git_root):
     print("  👀 detected git repository at", git_root)
     feedback.feedback({"event": "git_repo_detected"})
     with loading_animation(Simple("checking for README files... [ctrl+c] cancel")):
-        files = _discover_indexable_files(git_root)
+        try:
+            files = _discover_indexable_files(git_root)
+        except KeyboardInterrupt:
+            feedback.feedback({"event": "git_repo_cancelled"})
+            _set_processed(git_root)
+            print("  checking for README files cancelled, will not attempt to index this repository again")
+            return
     _set_processed(git_root)
     feedback.feedback({"event": "indexable_files", "count": len(files)})
     if len(files) == 0:
@@ -64,7 +70,8 @@ def offer_to_index(git_root):
         return [_pretty_option(git_root, f, s) for (f, s) in zip(files, selected)]
 
     def toggle_selection(index):
-        if index >= len(global_options):
+        if index >= len(files):
+            # don't toggle the global options
             return
         selected[index] = not selected[index]
         ui.reset_options(make_file_options() + global_options, is_loading=False)
