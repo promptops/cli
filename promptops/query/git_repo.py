@@ -22,6 +22,10 @@ def _is_processed(git_root):
 
 def _set_processed(git_root):
     fname = os.path.expanduser(os.path.join(settings.user_index_root, "git_roots.txt"))
+    if not os.path.exists(fname):
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        with open(fname, "w") as f:
+            pass
     with open(fname, "a") as f:
         f.write(git_root + "\n")
 

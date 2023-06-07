@@ -16,4 +16,7 @@ def is_ignored(path):
         return True
     except subprocess.CalledProcessError as e:
         logging.debug("%s return code: %d", path, e.returncode)
-        return False
+        if e.returncode == 1:
+            return False
+        else:
+            return True
