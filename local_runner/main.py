@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 import requests
 
@@ -17,7 +18,11 @@ async def _main():
         c = creds.default(cfg.credentials_file)
     except creds.NotFoundError:
         print("Credentials not found. Initiating pairing...")
-        c = await asyncio.wait_for(register(cfg.registration_url, cfg.registration_code_rotation), cfg.registration_timeout)
+        try:
+            c = await asyncio.wait_for(register(cfg.registration_url, cfg.registration_code_rotation), cfg.registration_timeout)
+        except asyncio.TimeoutError:
+            print("Pairing timed out")
+            sys.exit(1)
         creds.store(cfg.credentials_file, c)
 
     issuer = Issuer(c)
