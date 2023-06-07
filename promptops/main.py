@@ -133,10 +133,22 @@ def entry_alias():
 
         history.update_history()
 
-    if args.question and len(args.question) > 0 and args.question[0] == 'workflow':
-        workflow_entrypoint(args)
-    else:
-        query.query_mode(args)
+    if args.question and len(args.question) > 0:
+        if args.question[0] == 'workflow':
+            return workflow_entrypoint(args)
+        elif args.question[0] == 'index':
+            # index subcommand
+            subparser = ArgumentParser(
+                prog=f"{alias} index",
+                usage=f"{alias} index [action]",
+                description=f"{alias} index: manage the indexed data",
+            )
+            subparser.add_argument("action", choices=["list", "add", "remove", "test"], help="list or update the index")
+            subparser.add_argument("--source", help="the source to add or remove")
+            subparser.add_argument("--query", help="query to test with")
+            sub_args = subparser.parse_args(args.question[1:])
+            return index_entry_point(sub_args)
+    query.query_mode(args)
 
 
 def entry_main():
