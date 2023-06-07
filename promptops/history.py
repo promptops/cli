@@ -87,7 +87,7 @@ def index_history(show_progress: bool = None, max_history: int = 5000):
 
     indexed_commands = {obj if isinstance(obj, str) else obj["cmd"] for obj in db.objects}
     delta = list(set(prev_commands) - indexed_commands)
-    batch_size = 32
+    batch_size = 8
 
     if show_progress is None and len(delta) > batch_size:
         from promptops.loading.progress import ProgressSpinner
