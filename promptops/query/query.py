@@ -48,7 +48,7 @@ def deduplicate(results: list[Result]):
 
 def printer(pipe, func):
     for line in iter(pipe.readline, b''):
-        line_decoded = line.decode().strip()
+        line_decoded = line.decode()
         sys.stdout.write(line_decoded)
         sys.stdout.flush()
         func(line)
@@ -63,8 +63,8 @@ def run(cmd: Result) -> (int, Optional[str]):
         stdout = []
         stderr = []
 
-        thread_out = threading.Thread(target=printer, args=[process.stdout, lambda line: stdout.append(line.decode().strip())])
-        thread_err = threading.Thread(target=printer, args=[process.stderr, lambda line: stderr.append(line.decode().strip())])
+        thread_out = threading.Thread(target=printer, args=[process.stdout, lambda line: stdout.append(line.decode())])
+        thread_err = threading.Thread(target=printer, args=[process.stderr, lambda line: stderr.append(line.decode())])
 
         thread_out.start()
         thread_err.start()
