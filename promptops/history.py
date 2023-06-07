@@ -87,7 +87,7 @@ def index_history(show_progress: bool = None, max_history: int = 5000):
 
     indexed_commands = {obj if isinstance(obj, str) else obj["cmd"] for obj in db.objects}
     delta = list(set(prev_commands) - indexed_commands)
-    batch_size = 8
+    batch_size = 32
 
     if show_progress is None and len(delta) > batch_size:
         from promptops.loading.progress import ProgressSpinner
@@ -102,13 +102,12 @@ def index_history(show_progress: bool = None, max_history: int = 5000):
             progress.set(100)
         return has_more
 
-    progress_inc = (100 - 6) // (len(delta) / batch_size)
-
+    start_progress = 6
     for i in range(0, len(delta), batch_size):
-        for cmd, vector in embedding_batch(delta[i : i + batch_size]):
+        for cmd, vector in embedding_batch(delta[i: i + batch_size]):
             db.add(vector, {"cmd": cmd, "ignore": False})
         if show_progress:
-            progress.increment(progress_inc)
+            progress.set(start_progress + (i + batch_size) / len(delta) * (100 - start_progress))
 
     db.save(os.path.expanduser(settings.history_db_path))
 
