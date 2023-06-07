@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 from promptops import settings
@@ -75,4 +76,7 @@ def is_changed() -> bool:
     data = _build_data()
     diff_keys = dict_diff_keys(data, _loaded_data or {})
     diff_keys.discard("endpoint")
+    logging.debug(f"diff_keys: {diff_keys}")
+    logging.debug("data: %s", data)
+    logging.debug("_loaded_data: %s", _loaded_data)
     return len(diff_keys) > 0

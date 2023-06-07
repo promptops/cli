@@ -1,5 +1,4 @@
 import sys
-from typing import Optional
 
 from promptops import settings
 import os
@@ -13,7 +12,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 import requests
 from promptops.trace import trace_id
-from promptops.settings_store import save, set_index_history
+from promptops import settings_store
 
 
 @lru_cache(maxsize=1)
@@ -70,7 +69,7 @@ def config_flow() -> dict:
     if selection != 1:
         from promptops.history import index_history
 
-        set_index_history(True)
+        settings_store.set_index_history(True)
         initial_batch = 5000
         has_more = index_history(show_progress=True, max_history=initial_batch)
         config_selections["loaded_history"] = True
@@ -102,9 +101,7 @@ def config_flow() -> dict:
         ui = selections.UI(options, is_loading=False)
         selection = ui.input()
         if selection == 0:
-            from promptops.settings_store import set_history_context
-
-            set_history_context(context_size)
+            settings_store.set_history_context(context_size)
             config_selections["context_size"] = context_size
             break
         else:
@@ -119,9 +116,7 @@ def config_flow() -> dict:
                     break
             if choice == GO_BACK:
                 continue
-            from promptops.settings_store import set_history_context
-
-            set_history_context(int(choice))
+            settings_store.set_history_context(int(choice))
             config_selections["context_size"] = int(choice)
             break
 
@@ -148,4 +143,4 @@ def register():
     config = config_flow()
     config["trace_id"] = trace_id
     requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
-    save()
+    settings_store.save()

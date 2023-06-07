@@ -128,6 +128,7 @@ def entry_alias():
     version_check.version_check()
     if not registered or args.config:
         user.register()
+        args.history_context = settings.history_context
     else:
         from promptops import history
 
@@ -223,6 +224,7 @@ def entry_main():
             sys.exit(0)
         if args.config:
             user.register()
+            args.history_context = settings.history_context
             sys.exit(0)
 
         parser.print_help()
@@ -236,6 +238,7 @@ def entry_main():
     version_check.version_check()
     if not registered:
         user.register()
+        args.history_context = settings.history_context
     else:
         from promptops import history
 
