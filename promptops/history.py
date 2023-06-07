@@ -65,7 +65,7 @@ def embedding_batch(cmds: List[str]) -> List[tuple[str, np.ndarray]]:
     return items
 
 
-def index_history(show_progress: bool = None, max_history: int = 5000):
+def index_history(show_progress: bool = None, max_history: int = 1000):
     progress = None
     if show_progress:
         from promptops.loading.progress import ProgressSpinner

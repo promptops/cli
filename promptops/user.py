@@ -70,7 +70,7 @@ def config_flow() -> dict:
         from promptops.history import index_history
 
         settings_store.set_index_history(True)
-        initial_batch = 5000
+        initial_batch = 1000
         has_more = index_history(show_progress=True, max_history=initial_batch)
         config_selections["loaded_history"] = True
         if has_more:
