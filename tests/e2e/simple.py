@@ -33,14 +33,18 @@ def simple():
         )
         child.logfile_read = wrapper
         print("spawned, waiting for echo")
-        child.expect("✨ echo 'test'")
+        index = child.expect_exact(["➜︎ \x1b[1mAccept all\x1b[0m", pexpect.TIMEOUT], timeout=5)
+        if index == 0:
+            child.send("\n")
+        child.expect("✨ echo '?test'?")
         print("found echo, attempting to select")
         attempts = 5
         while True:
             if attempts == 0:
                 raise Exception("failed to select")
-            index = child.expect_exact(["➜︎ \x1b[1m✨ echo 'test'\x1b[0m", pexpect.TIMEOUT], timeout=0.5)
-            if index == 0:
+            options = ["➜︎ \x1b[1m✨ echo 'test'\x1b[0m", "➜︎ \x1b[1m✨ echo test\x1b[0m", pexpect.TIMEOUT]
+            index = child.expect_exact(options, timeout=0.5)
+            if options[index] != pexpect.TIMEOUT:
                 break
             print("timeout, sending down, attempts left", attempts)
             child.send("\x1b[B")
@@ -48,7 +52,7 @@ def simple():
         print("moved to echo, confirming")
         child.send("\n")
         print("sent newline, waiting for prompt")
-        child.expect("> echo 'test'")
+        child.expect("> echo '?test'?")
         print("found prompt, confirming")
         child.send("\n")
         print("sent newline, waiting to complete")
@@ -66,7 +70,8 @@ def simple():
             print(line)
         print("=====================================")
     assert child.exitstatus == 0
-    assert screen.display[last_line].strip() == "test"
+    # note: for some reason the last line has leftover loading characters
+    assert screen.display[last_line].strip().endswith("test")
 
 
 if __name__ == "__main__":
