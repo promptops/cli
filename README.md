@@ -43,7 +43,7 @@ um <question>
 ```
 
 ```shell
-um workflow <multi-stepped-prompt>
+um recipe <multi-stepped-prompt>
 ```
 
 ## local runner

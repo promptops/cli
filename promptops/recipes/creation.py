@@ -206,7 +206,7 @@ def save_flow(recipe):
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
 
-def list_workflows():
+def list_recipes():
     response = requests.get(settings.endpoint + f"/recipe?trace_id={trace.trace_id}", headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
     })
@@ -218,13 +218,13 @@ def list_workflows():
     return response.json().get('recipes', [])
 
 
-def available_workflows():
-    recipes = list_workflows()
+def available_recipes():
+    recipes = list_recipes()
     if not recipes or len(recipes) == 0:
-        print("You don't have any saved workflows. To create a workflow try 'um workflow <prompt>'")
+        print("You don't have any saved recipes. To create a recipe try 'um recipe <prompt>'")
         return None
 
-    print("Select from available workflows: ")
+    print("Select from available recipes: ")
     names = [p.get('name') for p in recipes]
     selected = None
     while not selected:
@@ -233,27 +233,27 @@ def available_workflows():
         print()
 
         print(f"{names[recipe_selection]}: {recipes[recipe_selection].get('prompt')}")
-        confirmed = confirm("Use this workflow?")
+        confirmed = confirm("Use this recipe?")
         if confirmed != GO_BACK:
             selected = recipes[recipe_selection]
         else:
-            print("\nSelect from available workflows: ")
+            print("\nSelect from available recipes: ")
     return selected
 
 
-def workflow_entrypoint(args):
+def recipe_entrypoint(args):
     try:
         new_recipe = True
         if not args or len(args.question) < 2:
             new_recipe = False
-            recipe = available_workflows()
+            recipe = available_recipes()
             if not recipe:
                 return
             recipe = init_recipe(recipe['prompt'], recipe['language'], recipe['id'])
         else:
             prompt = " ".join(args.question[1:])
 
-            print("Workflows are currently based on Terraform. Support for more methods coming soon.\n")
+            print("Recipes currently utilize Terraform. Support for more methods coming soon.\n")
             # ui = selections.UI(LANG_OPTIONS, is_loading=False)
             # selection = ui.input()
             # print()
@@ -272,14 +272,14 @@ def workflow_entrypoint(args):
 
         if new_recipe:
             print()
-            print("Would you like to save this as a reusable workflow?")
+            print("Would you like to save this as a reusable recipe?")
             print()
             ui = selections.UI(["save", "exit"], is_loading=False)
             selection = ui.input()
             if selection == 0:
                 save_flow(recipe)
                 print()
-                print("To use a saved workflow, simply type 'um workflow'")
+                print("To use a saved recipe, simply type 'um recipe'")
             print()
     except KeyboardInterrupt:
         pass

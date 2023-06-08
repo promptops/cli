@@ -27,7 +27,7 @@ from promptops import settings_store
 from promptops import version_check
 from promptops import query
 from promptops import user
-from promptops.recipes.creation import workflow_entrypoint
+from promptops.recipes.creation import recipe_entrypoint
 from promptops.index.entry_point import entry_point as index_entry_point
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
@@ -135,8 +135,8 @@ def entry_alias():
         history.update_history()
 
     if args.question and len(args.question) > 0:
-        if args.question[0] == 'workflow':
-            return workflow_entrypoint(args)
+        if args.question[0] == 'workflow' or args.question[0] == 'recipe':
+            return recipe_entrypoint(args)
         elif args.question[0] == 'index':
             # index subcommand
             subparser = ArgumentParser(
@@ -198,9 +198,9 @@ def entry_main():
     parser_runner = subparsers.add_parser("runner", help="run commands from slack")
     parser_runner.set_defaults(func=runner_mode)
 
-    parser_workflow = subparsers.add_parser("workflow", help="run a complex or multi-stepped script")
+    parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
-    parser_workflow.set_defaults(func=workflow_entrypoint)
+    parser_workflow.set_defaults(func=recipe_entrypoint)
 
     parser_index = subparsers.add_parser("index", help="manage the indexed data")
     parser_index.add_argument("action", choices=["list", "add", "remove", "test"], help="list or update the index")
