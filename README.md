@@ -95,3 +95,9 @@ test with
 ```shell
 um get pods
 ```
+
+## Publishing pip release
+
+```shell
+make publish
+```
