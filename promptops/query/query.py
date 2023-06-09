@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -8,6 +9,7 @@ import threading
 import random
 from typing import Optional
 
+import colorama
 import requests
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -108,8 +110,15 @@ def make_revise_option():
 ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨"}
 
 
+def ellipsis_if_needed(text, max_width, more="..."):
+    if len(text) <= max_width:
+        return text
+    return text[:max_width - len(more)] + more
+
+
 def pretty_result(result: Result):
-    return (ORIGIN_SYMBOLS.get(result.origin, f"[{result.origin[0]}]") + " " if result.origin else "") + result.script
+    text = result.script if result.lang != "text" else colorama.Fore.YELLOW + ellipsis_if_needed(result.script, 120, "...") + colorama.Style.RESET_ALL
+    return (ORIGIN_SYMBOLS.get(result.origin, f"[{result.origin[0]}]") + " " if result.origin else "") + text
 
 
 @dataclass
@@ -251,11 +260,21 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
             return ConfirmResult(question=selected, options=[r.script for r in results if r.origin == "promptops"])
         else:
             selected = results[index]
-            if selected.explanation:
-                print_formatted_text(HTML(selected.explanation))
+            explanation = selected.explanation if selected.lang != "text" else selected.script
+            if explanation:
+                print_formatted_text(HTML(explanation))
                 print()
-                confirmed = prompts.confirm_command(selected.script, False)
-            elif selected.origin == "promptops" and settings.request_explanation:
+                if selected.lang != "text":
+                    confirmed = prompts.confirm_command(selected.script, False)
+                else:
+                    selected = prompts.confirm_clarify("")
+                    if selected == prompts.GO_BACK:
+                        continue
+                    elif selected == prompts.EXIT:
+                        raise KeyboardInterrupt()
+                    return ConfirmResult(question=selected,
+                                         options=[r.script for r in results if r.origin == "promptops"])
+            elif selected.origin == "promptops" and selected.lang != "text" and settings.request_explanation:
 
                 done_loading = threading.Event()
 
@@ -401,6 +420,9 @@ def do_query(question: str):
         feedback({"event": "cancelled"})
         sys.exit(1)
 
+    if cmd.lang == "text":
+        return
+
     if (cmd.script != confirmed or len(questions) > 1) and confirmed:
         # the user corrected the script
         db = corrections.get_db()
@@ -421,6 +443,7 @@ def do_query(question: str):
         corrected_cmd = correction_loop("\n".join(questions), revised_cmd.script, stderr)
         if not corrected_cmd:
             return
+        feedback({"event": "run"})
         rc, stderr = run(corrected_cmd)
         if rc == 0:
             db = corrections.get_db()
@@ -504,5 +527,12 @@ def query(
     try:
         return [Result.from_dict(entry) for entry in data["suggestions"]]
     except KeyError:
-        logging.debug("response: %s", data)
-        raise
+        logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
+
+    try:
+        message = data.get("message")
+    except KeyError:
+        message = "-"
+        logging.debug("no message in response: %s", json.dumps(data, indent=2))
+
+    return [Result(script=message, lang="text", explanation="-")]
