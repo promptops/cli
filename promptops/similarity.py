@@ -21,6 +21,15 @@ class VectorDB(object):
             self.vectors = np.vstack((self.vectors, vector))
         self.objects.append(obj)
 
+    def update_or_add(self, vector, obj, equals: callable=None):
+        if equals is None:
+            equals = lambda a, b: a == b
+        for i, o in enumerate(self.objects):
+            if equals(o, obj):
+                self.vectors[i] = vector
+                return
+        self.add(vector, obj)
+
     def search(self, vector, k=1, min_similarity=0.8):
         # compute cosine similarity
         if len(self.vectors) == 0:

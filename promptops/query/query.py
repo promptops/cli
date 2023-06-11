@@ -260,21 +260,21 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
             return ConfirmResult(question=selected, options=[r.script for r in results if r.origin == "promptops"])
         else:
             selected = results[index]
-            explanation = selected.explanation if selected.lang != "text" else selected.script
-            if explanation:
-                print_formatted_text(HTML(explanation))
+            if selected.lang == "text":
+                print_formatted_text(selected.script)
                 print()
-                if selected.lang != "text":
-                    confirmed = prompts.confirm_command(selected.script, False)
-                else:
-                    selected = prompts.confirm_clarify("")
-                    if selected == prompts.GO_BACK:
-                        continue
-                    elif selected == prompts.EXIT:
-                        raise KeyboardInterrupt()
-                    return ConfirmResult(question=selected,
-                                         options=[r.script for r in results if r.origin == "promptops"])
-            elif selected.origin == "promptops" and selected.lang != "text" and settings.request_explanation:
+                selected = prompts.confirm_clarify("")
+                if selected == prompts.GO_BACK:
+                    continue
+                elif selected == prompts.EXIT:
+                    raise KeyboardInterrupt()
+                return ConfirmResult(question=selected,
+                                     options=[r.script for r in results if r.origin == "promptops"])
+            elif selected.explanation:
+                print_formatted_text(HTML(selected.explanation))
+                print()
+                confirmed = prompts.confirm_command(selected.script, False)
+            elif selected.origin == "promptops" and settings.request_explanation:
 
                 done_loading = threading.Event()
 
@@ -423,12 +423,12 @@ def do_query(question: str):
     if cmd.lang == "text":
         return
 
-    if (cmd.script != confirmed or len(questions) > 1) and confirmed:
+    if confirmed:
         # the user corrected the script
         db = corrections.get_db()
         q = "\n".join(questions)
         vector = similarity.embedding(text=q)
-        db.add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=confirmed).to_dict())
+        db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=confirmed).to_dict(), equals=lambda a, b: a["question"] == b["question"])
         logging.debug("added correction to db")
         db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "corrected"})
@@ -449,7 +449,7 @@ def do_query(question: str):
             db = corrections.get_db()
             q = "\n".join(questions)
             vector = similarity.embedding(text=q)
-            db.add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=corrected_cmd.script).to_dict())
+            db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=corrected_cmd.script).to_dict(), equals=lambda a, b: a["question"] == b["question"])
             logging.debug("added correction to db")
             db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "finished", "rc": rc, "corrected": True})
