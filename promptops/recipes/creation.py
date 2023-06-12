@@ -1,4 +1,6 @@
+import json
 import os
+import queue
 import subprocess
 from typing import Optional
 
@@ -9,7 +11,7 @@ from promptops import settings
 from promptops import trace
 from promptops import user
 from promptops.feedback import feedback
-from promptops.loading import loading_animation, Simple
+from promptops.loading.cancellable import CancellableMultiLoader, CancellableSimpleLoader
 from promptops.recipes.terraform import TerraformExecutor
 from promptops.ui import selections
 from promptops.ui.input import non_empty_input
@@ -42,26 +44,52 @@ def regenerate_recipe_execution(recipe, clarification):
     return response.json()
 
 
-def get_recipe_execution(recipe: dict):
+def get_recipe_execution(recipe: dict, loading=None):
     req = {
         "trace_id": trace.trace_id,
         "id": recipe['id'],
     }
 
     response = requests.post(
-        settings.endpoint + "/recipe/execution",
+        settings.endpoint + "/recipe/stream/execution",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
         },
+        stream=True
     )
-    if response.status_code != 200:
-        raise Exception(f"there was problem with the response, status: {response.status_code}")
 
-    return response.json()
+    recipe['execution'] = []
+    recipe['parameters'] = []
+    completed_queue = queue.Queue()
+    started_queue = queue.Queue()
+    file_loader = None
+    for line in response.iter_lines():
+        if line:
+            json_line = json.loads(line.decode('utf-8'))
+            if json_line.get('type') == 'files':
+                loading.stop()
+                file_loader = CancellableMultiLoader("generating execution", started_queue, completed_queue)
+                for file in json_line.get('files'):
+                    started_queue.put(file)
+            elif json_line.get('type') == 'execution':
+                existing = recipe.get('execution', [])
+                existing.append(json_line)
+                recipe['execution'] = existing
+                completed_queue.put(json_line.get('key'))
+            elif json_line.get('type') == 'parameter':
+                existing = recipe.get('parameters', [])
+                existing.append(json_line)
+                recipe['parameters'] = existing
+            else:
+                print('unknown json object', json_line)
+
+    if file_loader:
+        file_loader.stop()
+    return recipe
 
 
-def clarify_steps(recipe, clarification):
+def clarify_steps(recipe, clarification, loading=None):
     req = {
         "id": recipe['id'],
         "trace_id": trace.trace_id,
@@ -69,18 +97,27 @@ def clarify_steps(recipe, clarification):
     }
 
     response = requests.post(
-        settings.endpoint + "/recipe/clarify",
+        settings.endpoint + "/recipe/stream/clarify",
         json=req,
         headers={"user-agent": f"promptops-cli; user_id={user.user_id()}"}
     )
 
-    if response.status_code != 200:
-        raise Exception(f"there was problem with the response, status: {response.status_code}")
+    recipe['steps'] = []
+    for line in response.iter_lines():
+        if line:
+            json_line = json.loads(line.decode('utf-8'))
+            if json_line.get('id'):
+                recipe['id'] = json_line.get('id')
+            elif json_line.get('step'):
+                if loading:
+                    loading = loading.stop()
+                    print("Based on your requirements & extra details, I've set the project outline to include the following steps: ")
+                recipe['steps'].append(json_line.get('step'))
+                print(f"{len(recipe['steps'])}. {json_line.get('step')}")
+    return recipe
 
-    return response.json()
 
-
-def init_recipe(prompt: str, language: str, workflow_id=None):
+def init_recipe(prompt: str, language: str, workflow_id=None, loading=None):
     req = {
         "prompt": prompt,
         "trace_id": trace.trace_id,
@@ -94,17 +131,29 @@ def init_recipe(prompt: str, language: str, workflow_id=None):
         req['shell'] = os.environ.get("SHELL")
 
     response = requests.post(
-        settings.endpoint + "/recipe/init",
+        settings.endpoint + "/recipe/stream/init",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
-        }
+        },
+        stream=True
     )
 
-    if response.status_code != 200:
-        raise Exception(f"there was problem with the response, status: {response.status_code}")
-
-    return response.json()
+    recipe = {
+        'steps': []
+    }
+    for line in response.iter_lines():
+        if line:
+            json_line = json.loads(line.decode('utf-8'))
+            if json_line.get('id'):
+                recipe['id'] = json_line.get('id')
+            elif json_line.get('step'):
+                if loading:
+                    loading = loading.stop()
+                    print("Based on your requirements, I've set the project outline to include the following steps: ")
+                recipe['steps'].append(json_line.get('step'))
+                print(f"{len(recipe['steps'])}. {json_line.get('step')}")
+    return recipe
 
 
 def run(script: str, lang: str = "shell") -> (int, Optional[str]):
@@ -132,8 +181,7 @@ def print_steps(steps):
 def edit_steps(recipe):
     steps = recipe.get('steps', [])
     og = steps
-    print("Based on your requirements, I've set the project outline to include the following steps ")
-    print_steps(steps)
+    print()
 
     options = ["edit in vim", "clarify", "continue"]
     selection = None
@@ -149,12 +197,7 @@ def edit_steps(recipe):
         elif selection == 1:
             print()
             clarification = input("add details: ").strip()
-            with loading_animation(Simple("weaving in your clarification...")):
-                recipe = clarify_steps(recipe, clarification)
-            steps = recipe.get('steps')
-            print()
-            print("Based on your requirements & clarification, I've set the project outline to include the following steps ")
-            print_steps(steps)
+            recipe = clarify_steps(recipe, clarification, loading=CancellableSimpleLoader("getting an outline ready..."))
 
     if og != recipe.get('steps'):
         save_steps(recipe)
@@ -259,12 +302,11 @@ def recipe_entrypoint(args):
             # print()
             selection = 0
 
-            with loading_animation(Simple("getting an outline ready...")):
-                recipe = init_recipe(prompt, LANG_OPTIONS[selection])
+            recipe = init_recipe(prompt, LANG_OPTIONS[selection], loading=CancellableSimpleLoader("getting an outline ready..."))
             recipe = edit_steps(recipe)
 
-            with loading_animation(Simple("generating files, please be patient as this can take several minutes...")):
-                recipe = get_recipe_execution(recipe)
+            loading = CancellableSimpleLoader("generating files, please be patient as this can take several minutes...")
+            recipe = get_recipe_execution(recipe, loading)
 
         executor = TerraformExecutor(recipe)
         result = executor.run(regen=regenerate_recipe_execution)

@@ -16,7 +16,7 @@ class Step:
 class TerraformExecutor:
     def __init__(self, recipe):
         self.recipe = recipe
-        self.execution_steps = [Step(i.get('file'), i.get('content')) for i in recipe.get('execution')]
+        self.execution_steps = [Step(i.get('key'), i.get('value')) for i in recipe.get('execution')]
         self.parameters = recipe.get('parameters')
 
         directory = non_empty_input("enter a relative directory to store the terraform module in: ").strip()
