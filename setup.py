@@ -46,6 +46,7 @@ setup(
         "numpy~=1.24.3",
         "pyperclip~=1.8.2",
         "psutil~=5.9.5",
+        "thefuzz~=0.19.0",
         "boto3~=1.26.131",
         "kubernetes~=26.1.0",
         "setuptools",
