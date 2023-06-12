@@ -1,6 +1,4 @@
 from promptops import history
-from promptops import similarity
-import numpy as np
 
 
 def main():

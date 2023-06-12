@@ -29,6 +29,7 @@ from promptops import query
 from promptops import user
 from promptops.recipes.creation import recipe_entrypoint
 from promptops.index.entry_point import entry_point as index_entry_point
+from promptops.query.lookup import entry_point as lookup_entry_point
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
@@ -207,6 +208,11 @@ def entry_main():
     parser_index.add_argument("--source", help="the source to add or remove")
     parser_index.add_argument("--query", help="query to test with")
     parser_index.set_defaults(func=index_entry_point)
+
+    parser_lookup = subparsers.add_parser("lookup", help="extended reverse search, use --config to configure in your shell")
+    parser_lookup.add_argument("--config", help="print configuration for your shell")
+    parser_lookup.add_argument("command", nargs=REMAINDER, help="the command to lookup")
+    parser_lookup.set_defaults(func=lookup_entry_point)
 
     args = parser.parse_args()
 
