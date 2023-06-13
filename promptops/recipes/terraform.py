@@ -1,5 +1,4 @@
 import os
-import subprocess
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -80,7 +79,6 @@ class TerraformExecutor:
             print()
 
     def resolve_unfilled_parameters(self):
-        print(self.parameters)
         for parameter in self.parameters:
             value = None
             if parameter.get("options"):
@@ -89,7 +87,6 @@ class TerraformExecutor:
                 while True:
                     ui = selections.UI(options, is_loading=False)
                     selection = ui.input()
-
                     if parameter.get('type') != "list":
                         value = options[selection]
                         break

@@ -1,14 +1,12 @@
-import difflib
 import json
 import logging
 import os
 import queue
 import subprocess
-from typing import Optional
-
 import requests
 import sys
 
+from typing import Optional
 from promptops import settings
 from promptops import trace
 from promptops import user
@@ -81,8 +79,6 @@ def regenerate_recipe_execution(recipe, clarification, error=None, loading=None)
     return handle_execution_response(recipe, response, loading)
 
 
-
-
 def get_recipe_execution(recipe: dict, loading=None):
     req = {
         "trace_id": trace.trace_id,
@@ -104,16 +100,6 @@ def get_recipe_execution(recipe: dict, loading=None):
     return handle_execution_response(recipe, response, loading)
 
 
-def print_steps_diff(old, new):
-    # print('\x1b[2K\r')
-    # sys.stdout.write('\x1b[2K\r')
-    diff = difflib.ndiff(old[:len(new)], new)
-
-    print("\r".join([f"{i + 1}. {item}" for i, item in enumerate(diff)]))
-    # sys.stdout.write('\r'.join(diff))
-    # sys.stdout.flush()
-
-
 def clarify_steps(recipe, clarification, loading=None):
     req = {
         "id": recipe['id'],
@@ -128,10 +114,8 @@ def clarify_steps(recipe, clarification, loading=None):
         stream=True
     )
 
-    old_steps = recipe['steps']
     recipe['steps'] = []
     for line in response.iter_lines():
-        print(line)
         if line:
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
@@ -141,10 +125,11 @@ def clarify_steps(recipe, clarification, loading=None):
                     loading = loading.stop()
                     print("Based on your requirements & extra details, I've set the project outline to include the following steps: ")
                 recipe['steps'].append(json_line.get('step'))
-                print_steps_diff(old_steps, recipe['steps'])
+                print(f'{json_line.get("prefix", "")}{len(recipe["steps"])}. {json_line.get("step")}')
+                # print_steps_diff(old_steps, recipe['steps'])
             else:
-                print(line)
-
+                logging.debug("unsupported json item: ", line)
+    print()
     return recipe
 
 
@@ -226,7 +211,6 @@ def edit_steps(recipe):
             steps = recipe['steps']
             print_steps(steps)
         elif selection == 1:
-            print()
             clarification = input("add details: ").strip()
             recipe = clarify_steps(recipe, clarification, loading=CancellableSimpleLoader("getting an outline ready..."))
 
