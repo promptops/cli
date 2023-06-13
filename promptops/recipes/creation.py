@@ -1,4 +1,6 @@
+import difflib
 import json
+import logging
 import os
 import queue
 import subprocess
@@ -23,25 +25,62 @@ LANG_TF = 'terraform'
 LANG_OPTIONS = [LANG_TF, LANG_SHELL]
 
 
-def regenerate_recipe_execution(recipe, clarification):
+def handle_execution_response(recipe, response, loading):
+    completed_queue = queue.Queue()
+    started_queue = queue.Queue()
+    file_loader = None
+    loading_parameters = False
+    for line in response.iter_lines():
+        if line:
+            json_line = json.loads(line.decode('utf-8'))
+            if json_line.get('type') == 'files':
+                loading.stop()
+                file_loader = CancellableMultiLoader(started_queue, completed_queue)
+                for file in json_line.get('files'):
+                    started_queue.put(file)
+            elif json_line.get('type') == 'execution':
+                if not loading_parameters:
+                    completed_queue.put('gathering parameters')
+                    loading_parameters = False
+                recipe.setdefault('execution', []).append(json_line)
+                completed_queue.put(json_line.get('key'))
+            elif json_line.get('parameter'):
+                if not loading_parameters:
+                    started_queue.put('gathering parameters')
+                    loading_parameters = True
+                recipe.setdefault('parameters', []).append(json_line)
+            else:
+                logging.debug('unknown json object', json_line)
+
+    if file_loader:
+        file_loader.stop()
+    return recipe
+
+
+def regenerate_recipe_execution(recipe, clarification, error=None, loading=None):
     req = {
         "trace_id": trace.trace_id,
         "id": recipe['id'],
-        "clarification": clarification
+        "clarification": clarification,
     }
 
+    if error:
+        req['error'] = error
+
     response = requests.post(
-        settings.endpoint + "/recipe/regenerate",
+        settings.endpoint + "/recipe/stream/regenerate",
         json=req,
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
         },
+        stream=True
     )
-    if response.status_code != 200:
-        print(response.json())
-        raise Exception(f"there was problem with the response, status: {response.status_code}")
+    recipe['execution'] = []
+    recipe['parameters'] = []
 
-    return response.json()
+    return handle_execution_response(recipe, response, loading)
+
+
 
 
 def get_recipe_execution(recipe: dict, loading=None):
@@ -61,32 +100,18 @@ def get_recipe_execution(recipe: dict, loading=None):
 
     recipe['execution'] = []
     recipe['parameters'] = []
-    completed_queue = queue.Queue()
-    started_queue = queue.Queue()
-    file_loader = None
-    for line in response.iter_lines():
-        if line:
-            json_line = json.loads(line.decode('utf-8'))
-            if json_line.get('type') == 'files':
-                loading.stop()
-                file_loader = CancellableMultiLoader("generating execution", started_queue, completed_queue)
-                for file in json_line.get('files'):
-                    started_queue.put(file)
-            elif json_line.get('type') == 'execution':
-                existing = recipe.get('execution', [])
-                existing.append(json_line)
-                recipe['execution'] = existing
-                completed_queue.put(json_line.get('key'))
-            elif json_line.get('type') == 'parameter':
-                existing = recipe.get('parameters', [])
-                existing.append(json_line)
-                recipe['parameters'] = existing
-            else:
-                print('unknown json object', json_line)
 
-    if file_loader:
-        file_loader.stop()
-    return recipe
+    return handle_execution_response(recipe, response, loading)
+
+
+def print_steps_diff(old, new):
+    # print('\x1b[2K\r')
+    # sys.stdout.write('\x1b[2K\r')
+    diff = difflib.ndiff(old[:len(new)], new)
+
+    print("\r".join([f"{i + 1}. {item}" for i, item in enumerate(diff)]))
+    # sys.stdout.write('\r'.join(diff))
+    # sys.stdout.flush()
 
 
 def clarify_steps(recipe, clarification, loading=None):
@@ -99,11 +124,14 @@ def clarify_steps(recipe, clarification, loading=None):
     response = requests.post(
         settings.endpoint + "/recipe/stream/clarify",
         json=req,
-        headers={"user-agent": f"promptops-cli; user_id={user.user_id()}"}
+        headers={"user-agent": f"promptops-cli; user_id={user.user_id()}"},
+        stream=True
     )
 
+    old_steps = recipe['steps']
     recipe['steps'] = []
     for line in response.iter_lines():
+        print(line)
         if line:
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
@@ -113,7 +141,10 @@ def clarify_steps(recipe, clarification, loading=None):
                     loading = loading.stop()
                     print("Based on your requirements & extra details, I've set the project outline to include the following steps: ")
                 recipe['steps'].append(json_line.get('step'))
-                print(f"{len(recipe['steps'])}. {json_line.get('step')}")
+                print_steps_diff(old_steps, recipe['steps'])
+            else:
+                print(line)
+
     return recipe
 
 
@@ -308,8 +339,8 @@ def recipe_entrypoint(args):
             loading = CancellableSimpleLoader("generating files, please be patient as this can take several minutes...")
             recipe = get_recipe_execution(recipe, loading)
 
-        executor = TerraformExecutor(recipe)
-        result = executor.run(regen=regenerate_recipe_execution)
+        executor = TerraformExecutor(recipe, regenerate_recipe_execution)
+        result = executor.run()
         feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
 
         if new_recipe:

@@ -8,10 +8,9 @@ THREE_DOTS_DONE = ""
 
 
 class MultiLoader(LoadingBase):
-    def __init__(self, text: str, start_queue, done_queue, style=THREE_DOTS):
+    def __init__(self, start_queue, done_queue, style=THREE_DOTS):
         super().__init__()
         self._style = style
-        self._text = text
         self._start_queue = start_queue
         self._items = []
         self._done_queue = done_queue
@@ -20,11 +19,11 @@ class MultiLoader(LoadingBase):
 
     def _get_text(self):
         self._update()
-        builder = f"{self._text}\n"
+        builder = ""
         for item in self._items:
             char = self._style[self._step % len(self._style)]
             if item in self._done:
-                char = "[x]"
+                char = "x"
             builder += colorama.Fore.GREEN + char + colorama.Style.RESET_ALL + " " + item + "\n"
         return builder
 

@@ -20,9 +20,8 @@ class CancellableSimpleLoader:
 
 
 class CancellableMultiLoader:
-    def __init__(self, text: str, start_queue, done_queue):
-        self.text = text
-        loader = MultiLoader(text, start_queue, done_queue)
+    def __init__(self, start_queue, done_queue):
+        loader = MultiLoader(start_queue, done_queue)
         self.event = threading.Event()
         fps = 10
         self.t = threading.Thread(target=animate, args=(loader, self.event), kwargs=dict(fps=fps), daemon=True)
