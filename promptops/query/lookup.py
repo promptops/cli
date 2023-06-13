@@ -4,7 +4,8 @@ import queue
 from promptops.similarity import embedding
 from promptops.history import get_history_db
 from promptops.corrections import get_db
-from thefuzz import process, fuzz
+from thefuzz import process
+from promptops.shells import get_shell_name
 
 
 class App:
@@ -224,6 +225,17 @@ bind \\ce extended-search
 
 
 def entry_point(args):
+    if args.config:
+        shell_name = get_shell_name()
+        if shell_name != "zsh":
+            sys.stderr.write("Only zsh is supported for now.")
+            sys.exit(1)
+        if shell_name in CONFIG_SCRIPTS:
+            sys.stdout.write(CONFIG_SCRIPTS[shell_name])
+            sys.stdout.flush()
+            return
+        sys.exit(1)
+
     # give us some space
     max_results = 10
     sys.stderr.write("\n"*(max_results + 1))

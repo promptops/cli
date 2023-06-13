@@ -210,7 +210,7 @@ def entry_main():
     parser_index.set_defaults(func=index_entry_point)
 
     parser_lookup = subparsers.add_parser("lookup", help="extended reverse search, use --config to configure in your shell")
-    parser_lookup.add_argument("--config", help="print configuration for your shell")
+    parser_lookup.add_argument("--config", action="store_true", help="print configuration for your shell")
     parser_lookup.add_argument("command", nargs=REMAINDER, help="the command to lookup")
     parser_lookup.set_defaults(func=lookup_entry_point)
 

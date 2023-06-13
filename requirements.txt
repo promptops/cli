@@ -5,6 +5,7 @@ detect-secrets~=1.4.0
 prompt-toolkit~=3.0.38
 numpy~=1.24.3
 pyperclip~=1.8.2
+thefuzz~=0.19.0
 
 # extras for the local runner
 boto3~=1.26.131
