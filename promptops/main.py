@@ -25,27 +25,40 @@ import logging
 from promptops import settings
 from promptops import settings_store
 from promptops import version_check
-from promptops import query
 from promptops import user
-from promptops.recipes.creation import recipe_entrypoint
-from promptops.index.entry_point import entry_point as index_entry_point
-from promptops.query.lookup import entry_point as lookup_entry_point
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
 
 def runner_mode(args):
     from promptops.feedback import feedback
-
-    feedback(
-        {
-            "event": "runner_mode",
-        }
-    )
-
     from local_runner.main import entry_point
 
+    feedback({"event": "runner_mode"})
     entry_point()
+
+
+def query_mode(args):
+    from promptops import query
+    query.query_mode(args)
+
+
+def lookup_mode(args):
+    from promptops.feedback import feedback
+    from promptops.query.lookup import entry_point as lookup_entry_point
+
+    feedback({"event": "lookup_mode"})
+    lookup_entry_point(args)
+
+
+def recipe_mode(args):
+    from promptops.recipes.creation import recipe_entrypoint
+    recipe_entrypoint(args)
+
+
+def index_mode(args):
+    from promptops.index.entry_point import entry_point as index_entry_point
+    index_entry_point(args)
 
 
 def handle_exception(prev_handler):
@@ -137,7 +150,7 @@ def entry_alias():
 
     if args.question and len(args.question) > 0:
         if args.question[0] == 'workflow' or args.question[0] == 'recipe':
-            return recipe_entrypoint(args)
+            return recipe_mode(args)
         elif args.question[0] == 'index':
             # index subcommand
             subparser = ArgumentParser(
@@ -149,8 +162,8 @@ def entry_alias():
             subparser.add_argument("--source", help="the source to add or remove")
             subparser.add_argument("--query", help="query to test with")
             sub_args = subparser.parse_args(args.question[1:])
-            return index_entry_point(sub_args)
-    query.query_mode(args)
+            return index_mode(sub_args)
+    query_mode(args)
 
 
 def entry_main():
@@ -194,25 +207,25 @@ def entry_main():
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
     parser_question.add_argument("question", nargs=REMAINDER, help="the question to ask")
-    parser_question.set_defaults(func=query.query_mode)
+    parser_question.set_defaults(func=query_mode)
 
     parser_runner = subparsers.add_parser("runner", help="run commands from slack")
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
-    parser_workflow.set_defaults(func=recipe_entrypoint)
+    parser_workflow.set_defaults(func=recipe_mode)
 
     parser_index = subparsers.add_parser("index", help="manage the indexed data")
     parser_index.add_argument("action", choices=["list", "add", "remove", "test"], help="list or update the index")
     parser_index.add_argument("--source", help="the source to add or remove")
     parser_index.add_argument("--query", help="query to test with")
-    parser_index.set_defaults(func=index_entry_point)
+    parser_index.set_defaults(func=index_mode)
 
     parser_lookup = subparsers.add_parser("lookup", help="extended reverse search, use --config to configure in your shell")
     parser_lookup.add_argument("--config", action="store_true", help="print configuration for your shell")
     parser_lookup.add_argument("command", nargs=REMAINDER, help="the command to lookup")
-    parser_lookup.set_defaults(func=lookup_entry_point)
+    parser_lookup.set_defaults(func=lookup_mode)
 
     args = parser.parse_args()
 
@@ -240,6 +253,13 @@ def entry_main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    if getattr(args, "func") == lookup_mode:
+        if not args.verbose:
+            logging.basicConfig(level=logging.ERROR, format="%(message)s", force=True)
+        # shortcut for lookup
+        args.func(args)
+        return
 
     version_check.version_check()
     if not registered:

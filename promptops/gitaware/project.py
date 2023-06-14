@@ -4,7 +4,7 @@ import logging
 
 def git_root():
     try:
-        return subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode("utf-8").strip()
+        return subprocess.check_output(["git", "rev-parse", "--show-toplevel"], stderr=subprocess.STDOUT).decode("utf-8").strip()
     except subprocess.CalledProcessError as e:
         logging.debug("return code: %d", e.returncode)
         return None
