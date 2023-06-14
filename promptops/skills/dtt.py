@@ -1,12 +1,13 @@
 import logging
 import os.path
+import shlex
 import subprocess
 import sys
 
 import colorama
 
 from promptops.skills.commit_message import get_commit_message
-from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes, add_to_staging
+from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes
 from promptops.loading import loading_animation
 from promptops.loading.simple import Simple
 from promptops.ui import selections
@@ -96,10 +97,10 @@ def add_unstaged(files: list[str]):
 
     def view_diff(index):
         if index >= len(files):
-            # don't do anything
-            return
-        file_name = files[index]
-        subprocess.call(["git", "diff", file_name])
+            subprocess.call(["git", "diff"])
+        else:
+            file_name = files[index]
+            subprocess.call(["git", "diff", file_name])
 
     ui = selections.UI(
         make_file_options() + extra_options,
@@ -125,7 +126,11 @@ def add_unstaged(files: list[str]):
         ui._is_active = True
         ui.reset_options(make_file_options() + extra_options, is_loading=False)
         ui._is_active = False
-    add_to_staging([file for file, is_selected in zip(files, selected_files) if is_selected])
+    cmd = ["git", "add"] + [file for file, is_selected in zip(files, selected_files) if is_selected]
+    print(shlex.join(cmd))
+    rc = subprocess.call(cmd)
+    if rc != 0:
+        print(f"git commit failed with return code {rc}")
 
 
 def commit_staged(files: list[str]):
@@ -147,7 +152,8 @@ def commit_staged(files: list[str]):
     if selected is not None:
         print(options[selected])
 
-    print("running git commit")
-    rc = subprocess.call(["git", "commit", "-e", "-m", options[selected]])
+    cmd = ["git", "commit", "-e", "-m", options[selected]]
+    print(shlex.join(cmd))
+    rc = subprocess.call(cmd)
     if rc != 0:
         print(f"git commit failed with return code {rc}")

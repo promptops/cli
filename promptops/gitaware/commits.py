@@ -47,12 +47,3 @@ def get_staged_changes():
         return changes
     except subprocess.CalledProcessError as e:
         raise ValueError(f"git diff failed with return code {e.returncode}")
-
-
-def add_to_staging(files: list[str]):
-    """Add files to the staging area"""
-
-    rc = subprocess.call(["git", "add"] + files)
-    if rc != 0:
-        raise ValueError(f"git add failed with return code {rc}")
-    return
