@@ -115,21 +115,33 @@ def clarify_steps(recipe, clarification, loading=None):
     )
 
     recipe['steps'] = []
+    count_minus = 0
     for line in response.iter_lines():
         if line:
+            if loading:
+                loading.stop()
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
                 recipe['id'] = json_line.get('id')
             elif json_line.get('step'):
-                if loading:
-                    loading = loading.stop()
+                if len(recipe['steps']) == 0:
                     print("Based on your requirements & extra details, I've set the project outline to include the following steps: ")
                 recipe['steps'].append(json_line.get('step'))
-                print(f'{json_line.get("prefix", "")}{len(recipe["steps"])}. {json_line.get("step")}')
-                # print_steps_diff(old_steps, recipe['steps'])
+                prefix, step_num = json_line.get("prefix", ""), ""
+                if prefix == " -- ":
+                    count_minus += 1
+                else:
+                    step_num = str(len(recipe['steps']) - count_minus) + "."
+                print(f'{prefix}{step_num} {json_line.get("step")}')
+            if loading:
+                loading.start()
             else:
                 logging.debug("unsupported json item: ", line)
+
+    if loading:
+        loading.stop()
     print()
+
     return recipe
 
 
@@ -160,15 +172,22 @@ def init_recipe(prompt: str, language: str, workflow_id=None, loading=None):
     }
     for line in response.iter_lines():
         if line:
+            if loading:
+                loading.stop()
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
                 recipe['id'] = json_line.get('id')
             elif json_line.get('step'):
-                if loading:
-                    loading = loading.stop()
+                if len(recipe['steps']) == 0:
                     print("Based on your requirements, I've set the project outline to include the following steps: ")
                 recipe['steps'].append(json_line.get('step'))
                 print(f"{len(recipe['steps'])}. {json_line.get('step')}")
+            if loading:
+                loading.start()
+    if loading:
+        loading.stop()
+
+    print()
     return recipe
 
 
