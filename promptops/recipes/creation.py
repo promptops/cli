@@ -3,6 +3,8 @@ import logging
 import os
 import queue
 import subprocess
+
+import colorama
 import requests
 import sys
 
@@ -129,8 +131,10 @@ def clarify_steps(recipe, clarification, loading=None):
                 recipe['steps'].append(json_line.get('step'))
                 prefix, step_num = json_line.get("prefix", ""), ""
                 if prefix == " -- ":
+                    prefix = colorama.Fore.RED + prefix + colorama.Style.RESET_ALL
                     count_minus += 1
                 else:
+                    prefix = colorama.Fore.GREEN + prefix + colorama.Style.RESET_ALL
                     step_num = str(len(recipe['steps']) - count_minus) + "."
                 print(f'{prefix}{step_num} {json_line.get("step")}')
             if loading:
