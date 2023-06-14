@@ -378,6 +378,8 @@ def do_query(question: str):
     question = question.strip()
     if question == "":
         feedback({"event": "empty-initial-query"})
+        from promptops.skills import dtt
+        dtt.entry_point()
         for i in range(2):
             if i > 0:
                 print("please enter a question")
