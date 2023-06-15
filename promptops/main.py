@@ -26,6 +26,9 @@ from promptops import settings
 from promptops import settings_store
 from promptops import version_check
 from promptops import user
+from promptops.recipes.creation import recipe_entrypoint
+from promptops.index.entry_point import entry_point as index_entry_point
+from promptops.query.lookup import entry_point as lookup_entry_point
 
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
@@ -226,6 +229,11 @@ def entry_main():
     parser_lookup.add_argument("--config", action="store_true", help="print configuration for your shell")
     parser_lookup.add_argument("command", nargs=REMAINDER, help="the command to lookup")
     parser_lookup.set_defaults(func=lookup_mode)
+
+    parser_lookup = subparsers.add_parser("lookup", help="extended reverse search, use --config to configure in your shell")
+    parser_lookup.add_argument("--config", help="print configuration for your shell")
+    parser_lookup.add_argument("command", nargs=REMAINDER, help="the command to lookup")
+    parser_lookup.set_defaults(func=lookup_entry_point)
 
     args = parser.parse_args()
 
