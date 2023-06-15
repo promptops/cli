@@ -195,6 +195,52 @@ def init_recipe(prompt: str, language: str, workflow_id=None, loading=None):
     return recipe
 
 
+def get_recipe(prompt: str, language: str, workflow_id=None, loading=None):
+    req = {
+        "prompt": prompt,
+        "trace_id": trace.trace_id,
+        "platform": sys.platform,
+        "language": language,
+        "author": user.user_id(),
+        "recipe_id": workflow_id,
+    }
+
+    if language == LANG_SHELL:
+        req['shell'] = os.environ.get("SHELL")
+
+    response = requests.post(
+        settings.endpoint + "/recipe/init",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+        stream=True
+    )
+
+    recipe = {
+        'steps': []
+    }
+    for line in response.iter_lines():
+        if line:
+            if loading:
+                loading.stop()
+            json_line = json.loads(line.decode('utf-8'))
+            if json_line.get('id'):
+                recipe['id'] = json_line.get('id')
+            elif json_line.get('step'):
+                if len(recipe['steps']) == 0:
+                    print("Based on your requirements, I've set the project outline to include the following steps: ")
+                recipe['steps'].append(json_line.get('step'))
+                print(f"{len(recipe['steps'])}. {json_line.get('step')}")
+            if loading:
+                loading.start()
+    if loading:
+        loading.stop()
+
+    print()
+    return recipe
+
+
 def run(script: str, lang: str = "shell") -> (int, Optional[str]):
     if lang == "shell":
         proc = subprocess.run(
@@ -330,7 +376,7 @@ def recipe_entrypoint(args):
             recipe = available_recipes()
             if not recipe:
                 return
-            recipe = init_recipe(recipe['prompt'], recipe['language'], recipe['id'])
+            recipe = get_recipe(recipe['prompt'], recipe['language'], recipe['id'])
         else:
             prompt = " ".join(args.question[1:])
 
