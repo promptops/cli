@@ -1,4 +1,4 @@
-DEFAULT_ENDPOINT = "https://api-cli.promptops.com"
+DEFAULT_ENDPOINT = "https://cli.promptops.com"
 
 endpoint: str = DEFAULT_ENDPOINT
 request_explanation: bool = True
