@@ -195,7 +195,7 @@ def init_recipe(prompt: str, language: str, workflow_id=None, loading=None):
     return recipe
 
 
-def get_recipe(prompt: str, language: str, workflow_id=None, loading=None):
+def get_recipe(prompt: str, language: str, workflow_id=None):
     req = {
         "prompt": prompt,
         "trace_id": trace.trace_id,
@@ -214,31 +214,14 @@ def get_recipe(prompt: str, language: str, workflow_id=None, loading=None):
         headers={
             "user-agent": f"promptops-cli; user_id={user.user_id()}",
         },
-        stream=True
     )
 
-    recipe = {
-        'steps': []
-    }
-    for line in response.iter_lines():
-        if line:
-            if loading:
-                loading.stop()
-            json_line = json.loads(line.decode('utf-8'))
-            if json_line.get('id'):
-                recipe['id'] = json_line.get('id')
-            elif json_line.get('step'):
-                if len(recipe['steps']) == 0:
-                    print("Based on your requirements, I've set the project outline to include the following steps: ")
-                recipe['steps'].append(json_line.get('step'))
-                print(f"{len(recipe['steps'])}. {json_line.get('step')}")
-            if loading:
-                loading.start()
-    if loading:
-        loading.stop()
+    if response.status_code == 404:
+        return print("recipe not found")
+    elif response.status_code != 200:
+        return print("an error occurred retrieving the recipe")
 
-    print()
-    return recipe
+    return response.json()
 
 
 def run(script: str, lang: str = "shell") -> (int, Optional[str]):
