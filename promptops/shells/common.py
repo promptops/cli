@@ -14,7 +14,7 @@ _shells = {
 }
 
 
-def _resolve_shell():
+def get_shell_name():
     proc = psutil.Process(os.getpid())
 
     path = []
@@ -29,7 +29,7 @@ def _resolve_shell():
 
         if name in _shells:
             logging.debug(f"found shell: {'/'.join(path)}")
-            return _shells[name]()
+            return name
 
         try:
             proc = proc.parent()
@@ -45,9 +45,11 @@ def _resolve_shell():
         }
     )
     logging.debug(f"shell not supported: {'/'.join(path)}")
-    return NoopShell()
+    return None
 
 
 def get_shell():
-    shell = _resolve_shell()
-    return shell
+    shell_name = get_shell_name()
+    if shell_name is None:
+        return NoopShell()
+    return _shells[shell_name]()

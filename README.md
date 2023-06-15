@@ -7,8 +7,9 @@
 - find the right command without leaving the terminal
 - `um` can index your history to find commands you've run before
 - `um` instantly learns from your corrections
-- `um workflow` can help you provision infrastructure
 - simple interface to clarify your question or provide more context
+- NEW in 0.1.6: `um workflow` helps you provision infrastructure (currently terraform only, more coming soon)
+- NEW in 0.1.7: extended reverse search functionality with fuzzy matching and semantic search
 
 # Installation
 
@@ -33,6 +34,28 @@ Make sure you have python 3.10 or more recent
 ```shell
 pip3 install promptops
 ```
+
+# Configuration
+
+## Enable extended reverse search (Ctrl+E)
+
+Note: currently works only with Zsh
+
+Add the widget and the key binding to your `.zshrc` file
+```shell
+cp ~/.zshrc ~/.zshrc.backup
+echo 'eval "$(promptops lookup --config)"' >> ~/.zshrc
+```
+
+Reload
+```shell
+source ~/.zshrc
+```
+
+## Disable extended reverse search
+
+Remove the eval line from your `.zshrc` file and reload.
+
 
 # Usage
 

@@ -5,6 +5,7 @@ from promptops.similarity import embedding
 from promptops.history import get_history_db
 from promptops.corrections import get_db
 from thefuzz import process, fuzz
+from promptops.shells import get_shell_name
 
 
 class App:
@@ -38,6 +39,7 @@ class App:
         self._old_stdin_attrs = None
         self._max_items = max_items
         self._selected = 0
+        self._loading = False
 
         self._hist_db = get_history_db()
         self._corrections_db = get_db()
@@ -100,6 +102,7 @@ class App:
                 item,
                 [obj.get("cmd") if isinstance(obj, dict) else obj for obj in self._hist_db.objects],
                 limit=self._max_items,
+                scorer=fuzz.token_sort_ratio,
             )
             corrected_matches = process.extract(
                 item,
@@ -120,6 +123,7 @@ class App:
             matches = matches[:len(added)]
             self.options = [match for match, _ in matches[:self._max_items // 2]]
             self._selected = 0
+            self._loading = True
             self.render()
             try:
                 value = embedding(text=item)
@@ -147,6 +151,11 @@ class App:
                 self.render()
             except Exception as e:
                 self.options = [str(e)]
+                self._loading = False
+                self.render()
+            except Exception as e:
+                self.options = [str(e)]
+                self._loading = False
                 self.render()
 
     def render(self):
@@ -161,9 +170,14 @@ class App:
             self.lines = 0
             for index, option in enumerate(self.options):
                 text = option
+                text = option.split("\n")[0]
                 if index == self._selected:
                     text = f"\x1b[7m{text}\x1b[0m"
                 sys.stderr.write(f"\n\r{text}")
+                self.lines += 1
+
+            if self._loading:
+                sys.stderr.write(f"\n\r\x1b[2mloading...\x1b[0m")
                 self.lines += 1
 
             # restore the cursor position
@@ -224,6 +238,17 @@ bind \\ce extended-search
 
 
 def entry_point(args):
+    if args.config:
+        shell_name = get_shell_name()
+        if shell_name != "zsh":
+            sys.stderr.write("Only zsh is supported for now.")
+            sys.exit(1)
+        if shell_name in CONFIG_SCRIPTS:
+            sys.stdout.write(CONFIG_SCRIPTS[shell_name])
+            sys.stdout.flush()
+            return
+        sys.exit(1)
+
     # give us some space
     max_results = 10
     sys.stderr.write("\n"*(max_results + 1))
