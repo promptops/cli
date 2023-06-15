@@ -1,4 +1,4 @@
-DEFAULT_ENDPOINT = "http://0.0.0.0:8080"
+DEFAULT_ENDPOINT = "https://api-cli.promptops.com"
 
 endpoint: str = DEFAULT_ENDPOINT
 request_explanation: bool = True

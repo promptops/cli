@@ -7,7 +7,7 @@ install:
 	python setup.py install
 
 clean:
-	rm -f dist/*
+	rm dist/*
 
 package: clean
 	python -m build .
