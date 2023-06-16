@@ -1,9 +1,9 @@
 import os
 from dataclasses import dataclass
-from typing import Tuple
-
+from typing import Tuple, List
 from promptops.loading import Simple
 from promptops.loading.cancellable import CancellableSimpleLoader
+from promptops.recipes.executor import Executor
 from promptops.recipes.run import run_command
 from promptops.ui import selections
 from promptops.ui.input import non_empty_input
@@ -16,7 +16,7 @@ class Step:
     content: str
 
 
-class TerraformExecutor:
+class TerraformExecutor(Executor):
     def __init__(self, recipe, regen):
         self.recipe = recipe
         self.execution_steps = [Step(i.get('key'), i.get('value')) for i in recipe.get('execution')]
@@ -111,20 +111,23 @@ class TerraformExecutor:
 
         return self.parameters
 
+    @staticmethod
+    def get_tf_value_from_param(parameter):
+        if parameter['type'] == "list":
+            items = [f'"{i}"' for i in parameter['value']]
+            return f"[{' ,'.join(items)}]"
+        else:
+            return f"{parameter['value']}"
+
+
     def execute(self):
         for step in self.execution_steps:
             if not os.path.exists(self.directory + step.file):
                 open(self.directory + step.file, 'w').close()
             for parameter in self.parameters:
-                if parameter['parameter'] in step.content:
-                    if parameter['type'] == "list":
-                        items = [f'"{i}"' for i in parameter['value']]
-                        value = f"[{' ,'.join(items)}]"
-                    else:
-                        value = f"{parameter['value']}"
-
+                if parameter['parameter'] in step.content and parameter['value'].strip() != "":
                     var_name = f"<{parameter['parameter']}>"
-                    step.content = step.content.replace(var_name, value)
+                    step.content = step.content.replace(var_name, self.get_tf_value_from_param(parameter))
 
             with open(self.directory + step.file, "w") as outfile:
                 outfile.write(step.content)
@@ -144,7 +147,7 @@ class TerraformExecutor:
         return run_command("terraform plan", self.directory)
 
     def apply(self) -> Tuple[bool, str]:
-        return run_command("terraform apply", self.directory)
+        return run_command("terraform apply", self.directory)\
 
 
     def fix(self, error):
@@ -154,3 +157,26 @@ class TerraformExecutor:
         self.clean()
         self.write_files()
         return
+
+
+    def update(self) -> dict:
+        param_used = {p['parameter']: False for p in self.parameters}
+        for step in self.execution_steps:
+            with open(self.directory + step.file, 'r') as f:
+                edited_lines = "".join(f.readlines())
+
+            for parameter in self.parameters:
+                value = self.get_tf_value_from_param(parameter)
+                if value in edited_lines:
+                    param_used[parameter['parameter']] = True
+                    edited_lines = edited_lines.replace(value, "<" + parameter['parameter'] + ">")
+
+            print(f'before: \n {step.content} \n after: \n {edited_lines}\n')
+
+            step.content = edited_lines
+
+
+        self.recipe['execution'] = [{'key': step.file, 'value': step.content} for step in self.execution_steps]
+        self.parameters = [p for p in self.parameters if param_used[p['parameter']]]
+
+        return self.recipe

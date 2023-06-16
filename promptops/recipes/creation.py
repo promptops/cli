@@ -293,8 +293,38 @@ def save_steps(recipe):
         raise Exception(f"there was problem with the response, status: {response.status_code}")
 
 
+def edit_parameters(recipe):
+    parameter_names = [p.get('parameter') for p in recipe.get('parameters')]
+    options = parameter_names + ['exit']
+
+    while True:
+        print("Do you want to set defaults or modify any of the parameters?\n")
+
+        ui = selections.UI(options, is_loading=False)
+        selection = ui.input()
+
+        if selection == len(options) - 1:
+            break
+
+        parameter = recipe.get('parameters')[selection]
+        print(f"{parameter.get('name')}: {parameter.get('description')}")
+        modify = ['set a default value', 'modify the question', 'go back']
+        selection = None
+        while selection != 2:
+            print()
+            ui = selections.UI(modify, is_loading=False)
+            selection = ui.input()
+            if selection == 0:
+                parameter['default'] = non_empty_input('enter a default value: ')
+            elif selection == 1:
+                parameter['description'] = non_empty_input('enter a new question for the parameter: ')
+    return recipe
+
+
 def save_flow(recipe):
     print()
+    recipe = edit_parameters(recipe)
+
     req = {
         'id': recipe.get('id'),
         'trace_id': trace.trace_id,
@@ -386,6 +416,7 @@ def recipe_entrypoint(args):
             ui = selections.UI(["save", "exit"], is_loading=False)
             selection = ui.input()
             if selection == 0:
+                recipe = executor.update()
                 save_flow(recipe)
                 print()
                 print("To use a saved recipe, simply type 'um recipe'")
