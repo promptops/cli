@@ -376,24 +376,6 @@ def do_query(question: str):
         offer_to_index(git_root)
 
     question = question.strip()
-    if question == "":
-        feedback({"event": "empty-initial-query"})
-        from promptops.skills import dtt
-        dtt.entry_point()
-        for i in range(2):
-            if i > 0:
-                print("please enter a question")
-            bottom_toolbar = HTML("<b>[enter]</b> confirm <b>[ctrl+c]</b> exit")
-            # get the name of the calling script
-            alias = os.path.basename(sys.argv[0])
-            question = prompt_toolkit.prompt(f"{alias}: ", bottom_toolbar=bottom_toolbar)
-            question = question.strip()
-            if question != "":
-                break
-        else:
-            print("no question entered")
-            sys.exit(0)
-
     questions = [question]
     prev_results = []
 
@@ -402,25 +384,20 @@ def do_query(question: str):
     def input_loop():
         history_context = shells.get_shell().get_recent_history(settings.history_context) if settings.history_context else []
         while True:
-            try:
-                results = revise_loop(questions, prev_results, history_context)
-                if results.result:
-                    return results.result, results.confirmed
-                else:
-                    print()
-                    feedback({"event": "revise"})
-                    questions.append(results.question)
-                    prev_results.append(results.options)
-            except KeyboardInterrupt:
+            results = revise_loop(questions, prev_results, history_context)
+            if results.result:
+                return results.result, results.confirmed
+            else:
                 print()
-                feedback({"event": "cancelled"})
-                sys.exit(1)
+                feedback({"event": "revise"})
+                questions.append(results.question)
+                prev_results.append(results.options)
 
     try:
         cmd, confirmed = input_loop()
     except KeyboardInterrupt:
         feedback({"event": "cancelled"})
-        sys.exit(1)
+        return
 
     if cmd.lang == "text":
         return
@@ -455,28 +432,6 @@ def do_query(question: str):
             logging.debug("added correction to db")
             db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "finished", "rc": rc, "corrected": True})
-
-
-def query_mode(args):
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
-    settings.model = args.mode
-    settings.history_context = args.history_context
-    settings.request_explanation = args.explain
-    try:
-        do_query(" ".join(args.question))
-        if settings_store.is_changed():
-            for _ in range(3):
-                answer = input("save the current settings? [y/n]")
-                if answer == "y":
-                    settings_store.save()
-                    break
-                elif answer == "n":
-                    break
-    except KeyboardInterrupt:
-        pass
 
 
 def query(

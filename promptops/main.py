@@ -27,11 +27,12 @@ from promptops import settings_store
 from promptops import version_check
 from promptops import user
 
+from promptops.feedback import feedback
+
 ENDPOINT_ENV = "PROMPTOPS_ENDPOINT"
 
 
 def runner_mode(args):
-    from promptops.feedback import feedback
     from local_runner.main import entry_point
 
     feedback({"event": "runner_mode"})
@@ -39,8 +40,34 @@ def runner_mode(args):
 
 
 def query_mode(args):
-    from promptops import query
-    query.query_mode(args)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+    settings.model = args.mode
+    settings.history_context = args.history_context
+    settings.request_explanation = args.explain
+
+    question = " ".join(args.question)
+    try:
+        if question.strip():
+            feedback({"event": "query_mode"})
+            from promptops import query
+            query.do_query(question)
+        else:
+            feedback({"event": "dtt_mode"})
+            from promptops.skills import dtt
+            dtt.entry_point()
+    except KeyboardInterrupt:
+        return
+    if settings_store.is_changed():
+        for _ in range(3):
+            answer = input("save the current settings? [y/n]")
+            if answer == "y":
+                settings_store.save()
+                break
+            elif answer == "n":
+                break
 
 
 def lookup_mode(args):

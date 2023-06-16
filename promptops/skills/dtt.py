@@ -5,6 +5,8 @@ import subprocess
 import sys
 
 import colorama
+import prompt_toolkit
+from prompt_toolkit.formatted_text import HTML
 
 from promptops.skills.commit_message import get_commit_message
 from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes
@@ -12,18 +14,21 @@ from promptops.loading import loading_animation
 from promptops.loading.simple import Simple
 from promptops.ui import selections
 from promptops.gitaware.project import git_root
+from promptops.feedback import feedback
 
 from .choice import Choice
 
 
 def entry_point():
+    print()
     # check if there's input from stdin
     if not sys.stdin.isatty():
         contents = sys.stdin.read()
         if is_diff(contents) > 0.8:
+            feedback({"event": "stream_diff"})
             print("detected git diff")
             pick_commit_message(contents)
-            sys.exit(0)
+            return
 
     while True:
         options = []
@@ -38,14 +43,14 @@ def entry_point():
                 files = [os.path.relpath(os.path.join(root, f), cwd) for f in files]
                 options.append(Choice("add_unstaged", f"Add changes to staging area [{len(files)} files]", {"files": files}))
         options.append(Choice("query", "Ask a question", {}))
-        ui = selections.UI([choice.text for choice in options], header="Did you mean to...", is_loading=False)
+        ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=False)
         selected = ui.input()
-        if selected is not None:
-            print()
+        print()
+        try:
             handle(options[selected])
             print()
-        else:
-            sys.exit(0)
+        except KeyboardInterrupt:
+            pass
 
 
 def pick_commit_message(diff: str):
@@ -74,7 +79,21 @@ def handle(choice: Choice):
     elif choice.id == "add_unstaged":
         add_unstaged(**choice.parameters)
     elif choice.id == "query":
-        print("let's query here, prompt and stuff")
+        for i in range(2):
+            if i > 0:
+                print("please enter a question")
+            bottom_toolbar = HTML("<b>[enter]</b> confirm <b>[ctrl+c]</b> exit")
+            # get the name of the calling script
+            alias = os.path.basename(sys.argv[0])
+            question = prompt_toolkit.prompt(f"{alias}: ", bottom_toolbar=bottom_toolbar)
+            question = question.strip()
+            if question != "":
+                from promptops.query.query import do_query
+                do_query(question)
+                break
+        else:
+            print("no question entered")
+        return
 
 
 def add_unstaged(files: list[str]):
