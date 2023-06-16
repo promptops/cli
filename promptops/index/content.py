@@ -10,7 +10,7 @@ import requests
 from promptops.trace import trace_id
 from promptops import user
 from promptops.loading.progress import ProgressSpinner
-from promptops.secrets import scrub_file
+from promptops.secret import scrub_file
 from promptops import settings
 from promptops.similarity import VectorDB
 
