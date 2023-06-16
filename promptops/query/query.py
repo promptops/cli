@@ -14,7 +14,6 @@ import requests
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.formatted_text import HTML, to_formatted_text
-import prompt_toolkit
 
 from promptops import settings
 from promptops import trace
@@ -27,7 +26,6 @@ from promptops import corrections
 from promptops.corrections import get_correction
 from promptops.feedback import feedback
 from promptops import history
-from promptops import settings_store
 from promptops import scrub_secrets
 from promptops import shells
 from promptops.index import index_store

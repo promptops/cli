@@ -166,7 +166,22 @@ def commit_staged(files: list[str]):
     with loading_animation(Simple("Generating commit message...")):
         options = get_commit_message(diff, get_latest_commits(n=10))
 
-    ui = selections.UI(options, header="select commit message to use", is_loading=False)
+    def open_diff():
+        subprocess.call(["git", "diff", "--staged"])
+
+    ui = selections.UI(
+        options,
+        header="select commit message to use",
+        is_loading=False,
+        actions={
+            "d": lambda _, __: open_diff()
+        }, footer=" ".join([
+            selections.FOOTER_SECTIONS["select"],
+            f"{colorama.Style.BRIGHT}[d]{colorama.Style.RESET_ALL} view diff",
+            selections.FOOTER_SECTIONS["confirm"],
+            selections.FOOTER_SECTIONS["cancel"]
+        ])
+    )
     selected = ui.input()
     if selected is not None:
         print(options[selected])
