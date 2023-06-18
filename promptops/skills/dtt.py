@@ -183,8 +183,7 @@ def commit_staged(files: list[str]):
         ])
     )
     selected = ui.input()
-    if selected is not None:
-        print(options[selected])
+    print(options[selected])
 
     cmd = ["git", "commit", "-e", "-m", options[selected]]
     print(shlex.join(cmd))
