@@ -1,6 +1,9 @@
 import sys
 import threading
 import queue
+
+from promptops.feedback import feedback
+
 from promptops.similarity import embedding
 from promptops.history import get_history_db
 from promptops.corrections import get_db
@@ -257,6 +260,7 @@ def entry_point(args):
     try:
         text = App(max_items=max_results).run()
     except KeyboardInterrupt:
+        feedback({"event": "lookup-cancel"})
         sys.exit(1)
     if text is None:
         sys.exit(1)

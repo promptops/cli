@@ -3,6 +3,7 @@ import logging
 import os
 import queue
 import subprocess
+import time
 
 import colorama
 import requests
@@ -382,14 +383,17 @@ def available_recipes():
 
 
 def recipe_entrypoint(args):
+    last = "recipe-entrypoint"
     try:
         new_recipe = True
         if not args or len(args.question) < 2:
             new_recipe = False
+            last = "recipe-list"
             recipe = available_recipes()
             if not recipe:
                 return
             recipe = get_recipe(recipe['prompt'], recipe['language'], recipe['id'])
+            last = "recipe-select"
         else:
             prompt = " ".join(args.question[1:])
 
@@ -398,15 +402,19 @@ def recipe_entrypoint(args):
             # selection = ui.input()
             # print()
             selection = 0
-
+            last = "recipe-init"
             recipe = init_recipe(prompt, LANG_OPTIONS[selection], loading=CancellableSimpleLoader("getting an outline ready..."))
+            last = "recipe-edit-steps"
             recipe = edit_steps(recipe)
 
+            last = "recipe-get"
             loading = CancellableSimpleLoader("generating files, please be patient as this can take several minutes...")
             recipe = get_recipe_execution(recipe, loading)
 
+        last = "recipe-load-execution"
         executor = TerraformExecutor(recipe, regenerate_recipe_execution)
         result = executor.run()
+        last = "recipe-execute"
         feedback({"event": "recipe-execute", "id": recipe.get('id'), "result": result})
 
         if new_recipe:
@@ -417,9 +425,11 @@ def recipe_entrypoint(args):
             selection = ui.input()
             if selection == 0:
                 recipe = executor.update()
+                last = "recipe-save"
                 save_flow(recipe)
                 print()
                 print("To use a saved recipe, simply type 'um recipe'")
             print()
     except KeyboardInterrupt:
+        feedback({"event": "recipe-cancel", "last_executed": last, "time": time.time()})
         pass
