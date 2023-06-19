@@ -26,6 +26,11 @@ LANG_TF = 'terraform'
 LANG_OPTIONS = [LANG_TF, LANG_SHELL]
 
 
+class StreamException(Exception):
+    pass
+
+
+
 def handle_execution_response(recipe, response, loading):
     completed_queue = queue.Queue()
     started_queue = queue.Queue()
@@ -50,6 +55,8 @@ def handle_execution_response(recipe, response, loading):
                     started_queue.put('gathering parameters')
                     loading_parameters = True
                 recipe.setdefault('parameters', []).append(json_line)
+            elif json_line.get('error'):
+                raise StreamException
             else:
                 logging.debug('unknown json object', json_line)
 
@@ -126,6 +133,8 @@ def clarify_steps(recipe, clarification, loading=None):
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
                 recipe['id'] = json_line.get('id')
+            elif json_line.get('error'):
+                raise StreamException
             elif json_line.get('step'):
                 if len(recipe['steps']) == 0:
                     print("Based on your requirements & extra details, I've set the project outline to include the following steps: ")
@@ -182,6 +191,8 @@ def init_recipe(prompt: str, language: str, workflow_id=None, loading=None):
             json_line = json.loads(line.decode('utf-8'))
             if json_line.get('id'):
                 recipe['id'] = json_line.get('id')
+            elif json_line.get('error'):
+                raise StreamException
             elif json_line.get('step'):
                 if len(recipe['steps']) == 0:
                     print("Based on your requirements, I've set the project outline to include the following steps: ")
@@ -433,3 +444,6 @@ def recipe_entrypoint(args):
     except KeyboardInterrupt:
         feedback({"event": "recipe-cancel", "last_executed": last, "time": time.time()})
         pass
+    except StreamException:
+        print("Failed to stream the response back successfully, please try again")
+        feedback({"event": "recipe-error", "error": "failed to stream"})
