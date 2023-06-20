@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Tuple, List
-from promptops.loading import Simple
+from typing import Tuple
 from promptops.loading.cancellable import CancellableSimpleLoader
 from promptops.recipes.executor import Executor
 from promptops.recipes.run import run_command
@@ -52,7 +51,7 @@ class TerraformExecutor(Executor):
                 # todo: Create a cache of parameter values before regenerating!
                 print()
                 clarify = input("Provide more clarification (optional): ")
-                self.recipe = self.regen(self.recipe, clarify, loading=Simple("regenerating terraform files..."))
+                self.recipe = self.regen(self.recipe, clarify, loading=CancellableSimpleLoader("regenerating terraform files..."))
                 self.execution_steps = [Step(i.get('key'), i.get('value')) for i in self.recipe.get('execution')]
                 self.parameters = self.recipe.get('parameters')
                 self.clean()
