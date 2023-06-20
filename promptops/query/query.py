@@ -385,6 +385,17 @@ def do_query(question: str):
     question = question.strip()
     if question == "":
         feedback({"event": "empty-initial-query"})
+
+        from .suggest_next import suggest_next
+        try:
+            selected = suggest_next()
+            if selected:
+                run(selected)
+                feedback({"event": "predict-next-run"})
+                sys.exit(0)
+        except KeyboardInterrupt:
+            sys.exit(1)
+
         for i in range(2):
             if i > 0:
                 print("please enter a question")
