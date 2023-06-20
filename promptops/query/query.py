@@ -177,6 +177,13 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
                 relevant_indexed_data=relevant_indexed_data,
             ),
             daemon=True,
+        ),
+        ReturningThread(
+            curated,
+            kwargs=dict(
+                q=questions[-1],
+            ),
+            daemon=True,
         )
     ]
     num_running = len(tasks)
@@ -491,3 +498,46 @@ def query(
         logging.debug("no message in response: %s", json.dumps(data, indent=2))
 
     return [Result(script=message, lang="text", explanation="-")]
+
+
+def curated(*, q: str) -> list[Result]:
+    req = {
+        "query": q,
+        "trace_id": trace.trace_id,
+        "platform": sys.platform,
+        "shell": os.environ.get("SHELL"),
+    }
+    logging.debug("curated query with request: %s", req)
+    response = requests.post(
+        settings.endpoint + "/curated",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
+    if response.status_code != 200:
+        # this exception completely destroys the ui
+        return []
+        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
+
+    data = response.json()
+    try:
+        return [content_to_result(entry["content"]) for entry in data["items"] if entry["score"] >= 0.75]
+    except KeyError:
+        logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
+
+    try:
+        message = data.get("message")
+    except KeyError:
+        message = "-"
+        logging.debug("no message in response: %s", json.dumps(data, indent=2))
+
+    return [Result(script=message, lang="text", explanation="-")]
+
+
+def content_to_result(content) -> Result:
+    return Result(
+        script=content["content"],
+        lang="shell",
+        origin="promptops",
+    )

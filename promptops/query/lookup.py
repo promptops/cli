@@ -1,6 +1,9 @@
 import sys
 import threading
 import queue
+
+from promptops.feedback import feedback
+
 from promptops.similarity import embedding
 from promptops.history import get_history_db
 from promptops.corrections import get_db
@@ -148,6 +151,9 @@ class App:
                 matches = matches[:len(added)]
 
                 self.options = [match for match, _ in matches[:self._max_items]]
+                self.render()
+            except Exception as e:
+                self.options = [str(e)]
                 self._loading = False
                 self.render()
             except Exception as e:
@@ -166,6 +172,7 @@ class App:
             sys.stderr.write("\x1b[0J")
             self.lines = 0
             for index, option in enumerate(self.options):
+                text = option
                 text = option.split("\n")[0]
                 if index == self._selected:
                     text = f"\x1b[7m{text}\x1b[0m"
@@ -253,6 +260,7 @@ def entry_point(args):
     try:
         text = App(max_items=max_results).run()
     except KeyboardInterrupt:
+        feedback({"event": "lookup-cancel"})
         sys.exit(1)
     if text is None:
         sys.exit(1)

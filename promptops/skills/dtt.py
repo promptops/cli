@@ -3,6 +3,8 @@ import os.path
 import shlex
 import subprocess
 import sys
+import threading
+from dataclasses import dataclass
 
 import colorama
 import prompt_toolkit
@@ -15,8 +17,14 @@ from promptops.loading.simple import Simple
 from promptops.ui import selections
 from promptops.gitaware.project import git_root
 from promptops.feedback import feedback
-
+from promptops.query.explanation import ReturningThread
+from .next import instant_choices, generated_choices
 from .choice import Choice
+
+
+@dataclass
+class Counter:
+    value: int
 
 
 def entry_point():
@@ -42,8 +50,20 @@ def entry_point():
                 logging.debug("discovered unstaged changes: %s", files)
                 files = [os.path.relpath(os.path.join(root, f), cwd) for f in files]
                 options.append(Choice("add_unstaged", f"Add changes to staging area [{len(files)} files]", {"files": files}))
+
+        options.extend(instant_choices(3))
         options.append(Choice("query", "Ask a question", {}))
-        ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=False)
+
+        tasks = [
+            ReturningThread(generated_choices, daemon=True),
+        ]
+        num_running = Counter(len(tasks))
+        update_lock = threading.Lock()
+
+        ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=num_running.value > 0)
+        for task in tasks:
+            task.add_done_callback(done_callback(update_lock, ui, options, num_running))
+            task.start()
         selected = ui.input()
         print()
         try:
@@ -51,6 +71,20 @@ def entry_point():
             print()
         except KeyboardInterrupt:
             pass
+
+
+def done_callback(lock, ui, options, counter: Counter):
+    def inner(thread: ReturningThread):
+        try:
+            with lock:
+                counter.value -= 1
+                options.extend(thread.result())
+                if ui._is_active:
+                    ui.reset_options(options, is_loading=counter.value > 0)
+        except Exception as exc:
+            logging.exception(exc)
+
+    return inner
 
 
 def pick_commit_message(diff: str):
@@ -94,6 +128,8 @@ def handle(choice: Choice):
         else:
             print("no question entered")
         return
+    elif choice.id == "command":
+        print(">", choice.parameters["option"])
 
 
 def add_unstaged(files: list[str]):
