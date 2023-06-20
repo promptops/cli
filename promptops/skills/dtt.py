@@ -73,14 +73,14 @@ def entry_point():
             pass
 
 
-def done_callback(lock, ui, options, counter: Counter):
+def done_callback(lock, ui: selections.UI, options: list[Choice], counter: Counter):
     def inner(thread: ReturningThread):
         try:
             with lock:
                 counter.value -= 1
                 options.extend(thread.result())
-                if ui._is_active:
-                    ui.reset_options(options, is_loading=counter.value > 0)
+                if ui.is_active:
+                    ui.reset_options([option.text for option in options], is_loading=counter.value > 0)
         except Exception as exc:
             logging.exception(exc)
 
