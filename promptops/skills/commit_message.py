@@ -10,11 +10,12 @@ def entry_point(args):
     pass
 
 
-def get_commit_message(diff: str, prev_commits: list[str]):
+def get_commit_message(diff: str, prev_commits: list[str], max_options: int = 3) -> list[str]:
     req = {
         "trace_id": trace.trace_id,
         "diff": diff,
         "previous_commits": prev_commits,
+        "max_options": max_options,
     }
     logging.debug(f"request: {req}")
     response = requests.post(

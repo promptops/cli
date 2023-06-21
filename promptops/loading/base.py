@@ -5,8 +5,10 @@ LINE_UP = '\033[1A'
 
 
 class LoadingBase(object):
-    def __init__(self):
-        self._stream = sys.stdout
+    def __init__(self, stream=None):
+        if stream is None:
+            stream = sys.stdout
+        self._stream = stream
         self._step = 0
         self._written_lines = 0
 

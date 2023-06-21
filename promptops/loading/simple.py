@@ -8,8 +8,8 @@ FOUR_DOTS = "⡇⣆⣤⣰⢸⠹⠛⠏"
 
 
 class Simple(LoadingBase):
-    def __init__(self, text: str, style=THREE_DOTS):
-        super().__init__()
+    def __init__(self, text: str, style=THREE_DOTS, stream=None):
+        super().__init__(stream=stream)
         self._style = style
         self._text = text
 

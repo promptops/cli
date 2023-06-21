@@ -34,9 +34,12 @@ def entry_point():
         contents = sys.stdin.read()
         if is_diff(contents) > 0.8:
             feedback({"event": "stream_diff"})
-            print("detected git diff")
+            sys.stderr.write("detected git diff\n")
             pick_commit_message(contents)
             return
+        else:
+            sys.stderr.write("supported input types: git diff")
+            sys.stderr.write("example: git diff | um")
 
     while True:
         options = []
@@ -88,14 +91,15 @@ def done_callback(lock, ui: selections.UI, options: list[Choice], counter: Count
 
 
 def pick_commit_message(diff: str):
-    with loading_animation(Simple("Generating commit message...")):
+    with loading_animation(Simple("Generating commit message...", stream=sys.stderr)):
         options = get_commit_message(diff, get_latest_commits(n=10))
 
     sys.stdin = open("/dev/tty")
-    ui = selections.UI(options, is_loading=False)
-    selected = ui.input()
-    if selected is not None:
-        print(options[selected])
+    if len(options) > 0:
+        print(options[0])
+    else:
+        sys.stderr.write("failed to generate commit message")
+        sys.exit(1)
 
 
 def is_diff(contents: str) -> float:
