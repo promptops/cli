@@ -13,10 +13,29 @@ line
 : 1683929207:0;echo 'very \\
 long \\
 line'
+: 1683929206:0;echo \\\\not so \\\\
+long \\ line
 : 1683930257:0;export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 : 1683932479:0;exit
 """
 
+
+contents_simple = b"""
+export SECRET_KEY="aKbyRLXXXXXXXXXXXXXXXXXXXXXXXXXXIzYwm/lX"
+echo $SECRET_KEY
+cat single line > test.txt
+echo \xF0\x83\xBF\x83\xB8\x83\xA3
+echo very \\\\
+long \\\\
+line
+echo 'very \\
+long \\
+line'
+echo \\\\not so \\\\
+long \\ line
+export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+exit
+"""
 
 expected = [
     'export SECRET_KEY="<SECRET>"',
@@ -25,6 +44,7 @@ expected = [
     'echo 😃',
     "echo very \\\nlong \\\nline",
     "echo 'very \nlong \nline'",
+    "echo \\\\not so \\\nlong \\ line",
     # for some reason the JWT plugin fails to grab the full token, but that should be enough
     'export TOKEN="<SECRET>SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"',
     "exit",
@@ -35,6 +55,25 @@ def test_zsh():
     with tempfile.NamedTemporaryFile() as tmp:
         with open(tmp.name, "wb") as f:
             f.write(contents)
+
+        shell = Zsh(tmp.name)
+        cmds = shell.get_recent_history(2)
+        assert cmds == expected[-2:]
+
+        cmds = shell.get_recent_history(4)
+        assert cmds == expected[-4:]
+
+        cmds = shell.get_recent_history(10)
+        assert cmds == expected
+
+        cmds = shell.get_full_history()
+        assert cmds == expected
+
+
+def test_zsh_simple():
+    with tempfile.NamedTemporaryFile() as tmp:
+        with open(tmp.name, "wb") as f:
+            f.write(contents_simple)
 
         shell = Zsh(tmp.name)
         cmds = shell.get_recent_history(2)

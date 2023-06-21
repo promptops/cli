@@ -58,10 +58,11 @@ class Zsh(Shell):
                     line = line[:-1]
                     buffer = "\n" + line + buffer
                 else:
-                    cmd = buffer.lstrip("\n")
-                    if accept_command(cmd):
-                        commands.append(cmd)
-                    buffer = line
+                    if buffer:
+                        cmd = buffer.lstrip("\n")
+                        if accept_command(cmd):
+                            commands.append(cmd)
+                    buffer = "\n" + line
         return scrub_lines(fname, list(reversed(commands)))
 
     def get_full_history(self):
@@ -83,10 +84,19 @@ class Zsh(Shell):
                 if buffer != "":
                     commands.append(buffer)
                 buffer = line.split(";")[1].rstrip()
+                if buffer.endswith("\\"):
+                    buffer = buffer[:-1]
             else:
-                buffer += "\n" + line.rstrip()
-            if buffer.endswith("\\"):
-                buffer = buffer[:-1]
+                line = line.rstrip()
+                if line.endswith("\\"):
+                    buffer += "\n" + line[:-1]
+                else:
+                    if buffer:
+                        buffer = buffer.lstrip("\n")
+                        commands.append(buffer + "\n" + line)
+                    else:
+                        commands.append(line.lstrip("\n"))
+                    buffer = ""
         if buffer != "" and not buffer.endswith("\\"):
-            commands.append(buffer)
+            commands.append(buffer.lstrip("\n"))
         return commands
