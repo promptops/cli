@@ -30,7 +30,7 @@ class UI(object):
         header=""
     ):
         self._selected = 0
-        self._options = options
+        self._options = [o.replace("\n", "\n" + (" " * 6)) for o in options]
         self._is_loading = is_loading
         self._start = time.time()
         self._cursor = cursor
