@@ -3,7 +3,6 @@ import os.path
 import shlex
 import subprocess
 import sys
-import threading
 from dataclasses import dataclass
 
 import colorama
@@ -11,14 +10,14 @@ import prompt_toolkit
 from prompt_toolkit.formatted_text import HTML
 
 from promptops.skills.commit_message import get_commit_message
-from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes
+from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes, Change
 from promptops.loading import loading_animation
 from promptops.loading.simple import Simple
 from promptops.ui import selections, prompts
 from promptops.gitaware.project import git_root
 from promptops.feedback import feedback
 from promptops.query.explanation import ReturningThread
-from .next import instant_choices, generated_choices
+from .next import instant_choices
 from .choice import Choice
 
 
@@ -45,18 +44,15 @@ def entry_point():
         options = []
         if root := git_root():
             cwd = os.getcwd()
-            if files := get_staged_files():
-                logging.debug("discovered staged changes: %s", files)
-                files = [os.path.relpath(os.path.join(root, f), cwd) for f in files]
-                options.append(Choice("commit_staged", f"Commit staged changes [{len(files)} files]", {"files": files}))
-            if files := get_unstaged_files():
-                logging.debug("discovered unstaged changes: %s", files)
-                files = [os.path.relpath(os.path.join(root, f), cwd) for f in files]
-                options.append(Choice("add_unstaged", f"Add changes to staging area [{len(files)} files]", {"files": files}))
+            if changes := get_staged_files():
+                logging.debug("discovered staged changes: %s", changes)
+                options.append(Choice("commit_staged", f"Commit staged changes [{len(changes)} changes]", {"changes": changes, "root": root}))
+            if changes := get_unstaged_files():
+                logging.debug("discovered unstaged changes: %s", changes)
+                options.append(Choice("add_unstaged", f"Add changes to staging area [{len(changes)} changes]", {"changes": changes, "root": root}))
 
         options.extend(instant_choices(3))
         options.append(Choice("query", "Ask a question", {}))
-
 
         ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=False)
         selected = ui.input()
@@ -136,29 +132,34 @@ def handle(choice: Choice):
         run(Result(script=script, origin=choice.parameters["origin"]))
 
 
-def add_unstaged(files: list[str]):
-    files = sorted(files)
-    extra_options = ["Add all"]
-    selected_files = [False] * len(files)
+def add_unstaged(changes: list[Change], root: str):
+    cwd = os.getcwd()
 
-    def _pretty_option(file, is_selected):
-        return f"[{'x' if is_selected else ' '}] {file}"
+    def rel_file(change):
+        return os.path.relpath(os.path.join(root, change.file), cwd)
+
+    changes = sorted(changes, key=lambda change: rel_file(change))
+    extra_options = ["Add all"]
+    selected_files = [False] * len(changes)
+
+    def _pretty_option(change: Change, is_selected):
+        return f"[{'x' if is_selected else ' '}] ({change.modifier_desc()}) {rel_file(change)}"
 
     def make_file_options():
-        return [_pretty_option(file, is_selected) for file, is_selected in zip(files, selected_files)]
+        return [_pretty_option(change, is_selected) for change, is_selected in zip(changes, selected_files)]
 
     def toggle_selection(index):
-        if index >= len(files):
+        if index >= len(changes):
             # don't toggle the global options
             return
         selected_files[index] = not selected_files[index]
         ui.reset_options(make_file_options() + extra_options, is_loading=False)
 
     def view_diff(index):
-        if index >= len(files):
+        if index >= len(changes):
             subprocess.call(["git", "diff"])
         else:
-            file_name = files[index]
+            file_name = rel_file(changes[index])
             subprocess.call(["git", "diff", file_name])
 
     ui = selections.UI(
@@ -177,25 +178,26 @@ def add_unstaged(files: list[str]):
             selections.FOOTER_SECTIONS["cancel"]
         ])
     )
-    ui.select(len(files))
+    ui.select(len(changes))
     index = ui.input()
-    if index == len(files):
-        selected_files = [True] * len(files)
-    if index >= len(files):
+    if index == len(changes):
+        selected_files = [True] * len(changes)
+    if index >= len(changes):
         ui._is_active = True
         ui.reset_options(make_file_options() + extra_options, is_loading=False)
         ui._is_active = False
-    cmd = ["git", "add"] + [file for file, is_selected in zip(files, selected_files) if is_selected]
+    cmd = ["git", "add"] + [rel_file(change) for change, is_selected in zip(changes, selected_files) if is_selected]
     print(shlex.join(cmd))
     rc = subprocess.call(cmd)
     if rc != 0:
-        print(f"git commit failed with return code {rc}")
+        print(f"git add failed with return code {rc}")
 
 
-def commit_staged(files: list[str]):
+def commit_staged(changes: list[Change], root: str):
     print("staged changes")
-    for file in files:
-        print(f"  {file}")
+    cwd = os.getcwd()
+    for change in changes:
+        print(f" ({change.modifier_desc()}) {os.path.relpath(os.path.join(root, change.file), cwd)}")
     print()
 
     diff = get_staged_changes()

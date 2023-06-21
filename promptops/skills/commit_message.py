@@ -6,10 +6,6 @@ from promptops import user
 from promptops import trace
 
 
-def entry_point(args):
-    pass
-
-
 def get_commit_message(diff: str, prev_commits: list[str], max_options: int = 3) -> list[str]:
     req = {
         "trace_id": trace.trace_id,

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import subprocess
 import logging
 
@@ -14,27 +15,51 @@ def get_latest_commits(author=None, n=10):
         return None
 
 
-def get_staged_files():
+@dataclass
+class Change:
+    file: str
+    modifier: str
+
+    def modifier_desc(self):
+        if self.modifier == 'A':
+            return 'added'
+        elif self.modifier == 'M':
+            return 'modified'
+        elif self.modifier == 'D':
+            return 'deleted'
+        elif self.modifier == 'R':
+            return 'renamed'
+        elif self.modifier == 'C':
+            return 'copied'
+        elif self.modifier == 'U':
+            return 'updated'
+        elif self.modifier == '?':
+            return 'untracked'
+        else:
+            return 'Unknown'
+
+
+def get_staged_files() -> list[Change]:
     """Get the staged files from the git repo"""
     try:
         files = subprocess.check_output(["git", "status", "--porcelain"], stderr=subprocess.STDOUT).decode('utf-8').\
             split('\n')
         logging.debug('staged result: %s', files)
-        files = [file[3:] for file in files if file.strip() and file[0] != ' ' and file[:2] != '??']
-        return files
+        changes = [Change(file[3:], modifier=file[0]) for file in files if file.strip() and file[0] != ' ' and file[:2] != '??']
+        return changes
     except subprocess.CalledProcessError as e:
         logging.debug('return code: %d', e.returncode)
         return None
 
 
-def get_unstaged_files():
+def get_unstaged_files() -> list[Change]:
     """Get the unstaged files from the git repo using the git status command"""
     try:
         files = subprocess.check_output(['git', 'status', '--porcelain'], stderr=subprocess.STDOUT).decode('utf-8')\
             .split('\n')
         logging.debug('unstaged result: %s', files)
-        files = [file[3:] for file in files if file.strip() and file[1] != ' ']
-        return files
+        changes = [Change(file[3:], modifier=file[1]) for file in files if file.strip() and file[1] != ' ']
+        return changes
     except subprocess.CalledProcessError as e:
         logging.debug('return code: %d', e.returncode)
         return None
