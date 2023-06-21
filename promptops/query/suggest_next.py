@@ -1,18 +1,11 @@
 import fnmatch
 import logging
 import os
-import threading
-import random
-import time
 
 import Levenshtein
 import requests
-from typing import List, Optional
-from promptops.query.dtos import Result
-from promptops.query.explanation import ReturningThread
-from promptops.query import messages
-from promptops import shells, settings, user, trace, history
-from promptops.ui import selections, prompts
+from typing import List
+from promptops import shells, settings, user, trace
 
 
 class SuffixTree:
@@ -47,7 +40,7 @@ class SuffixTree:
 
         close = []
         for s2 in self.roots.keys():
-            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3, score_cutoff=.85)
+            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3, score_cutoff=.80)
             if score > 0 and count_dicts(self.roots[s2]) > 1:
                 close.append(self.roots[s2])
         return close
