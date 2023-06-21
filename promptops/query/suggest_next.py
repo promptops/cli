@@ -39,16 +39,19 @@ class SuffixTree:
             if root_cmd:
                 self.insert(lines[i:i+3])
 
-    def predict_next(self, command_sequence):
+    def predict_next(self, command_sequence, embeddings=None):
         entry = command_sequence[0]
         if entry not in self.roots or len(command_sequence) < 1:
             return None
 
         node = self.roots[entry]
 
-        for cmd in command_sequence[1:]:
+        for c, cmd in enumerate(command_sequence[1:]):
             if cmd in node:
                 node = node[cmd]['next']
+            # elif embeddings:
+            #     embedding = embeddings[c + 1]
+            #     possible_keys = node.keys()
             else:
                 return None
 
@@ -57,6 +60,9 @@ class SuffixTree:
         next_cmds.sort(key=lambda x: x[1])
 
         return [cmd for cmd, freq in next_cmds]
+
+
+suffix_tree = SuffixTree()
 
 
 def get_files():
@@ -73,8 +79,6 @@ def get_files():
 
 
 def suggest_next_suffix(count: int = 4) -> List[dict]:
-    suffix_tree = SuffixTree()
-
     context = shells.get_shell().get_recent_history(6)
     context.reverse()
 
@@ -88,6 +92,32 @@ def suggest_next_suffix(count: int = 4) -> List[dict]:
 
     return [{'option': p, 'origin': 'history'} for p in predictions][:count]
 
+#
+# def suggest_next_suffix_near(count: int = 2) -> List[dict]:
+#     context = shells.get_shell().get_recent_history(6)
+#     context.reverse()
+#     predictions = []
+#
+#     response = requests.post(
+#         settings.endpoint + "/embeddings",
+#         json={
+#             "trace_id": trace.trace_id,
+#             "batch": context,
+#         },
+#         headers={
+#             "user-agent": f"promptops-cli; user_id={user.user_id()}",
+#         },
+#     )
+#     embeddings = response.json()['result']
+#
+#     for i in range(1, 5):
+#         prediction = suffix_tree.predict_next(context[:i], embeddings)
+#         if prediction:
+#             predictions.extend(prediction)
+#             predictions.reverse()
+#
+#     return [{'option': p, 'origin': 'history'} for p in predictions][:count]
+#
 
 def suggest_next_gpt() -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
