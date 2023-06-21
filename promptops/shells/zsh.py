@@ -56,7 +56,12 @@ class Zsh(Shell):
                 line = line.rstrip()
                 if line.endswith("\\"):
                     line = line[:-1]
-                buffer = "\n" + line + buffer
+                    buffer = "\n" + line + buffer
+                else:
+                    cmd = buffer.lstrip("\n")
+                    if accept_command(cmd):
+                        commands.append(cmd)
+                    buffer = line
         return scrub_lines(fname, list(reversed(commands)))
 
     def get_full_history(self):
