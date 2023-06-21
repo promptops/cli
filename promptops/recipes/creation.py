@@ -435,8 +435,15 @@ def recipe_entrypoint(args):
             ui = selections.UI(["save", "exit"], is_loading=False)
             selection = ui.input()
             if selection == 0:
-                recipe = executor.update()
                 last = "recipe-save"
+
+                print("Would you like us to save the changes you made to the files?")
+                ui = selections.UI(["save", "skip"], is_loading=False)
+                selection = ui.input()
+
+                if selection == 0:
+                    recipe = executor.update()
+
                 save_flow(recipe)
                 print()
                 print("To use a saved recipe, simply type 'um recipe'")
