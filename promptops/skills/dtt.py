@@ -14,7 +14,7 @@ from promptops.skills.commit_message import get_commit_message
 from promptops.gitaware.commits import get_latest_commits, get_staged_files, get_unstaged_files, get_staged_changes
 from promptops.loading import loading_animation
 from promptops.loading.simple import Simple
-from promptops.ui import selections
+from promptops.ui import selections, prompts
 from promptops.gitaware.project import git_root
 from promptops.feedback import feedback
 from promptops.query.explanation import ReturningThread
@@ -129,7 +129,15 @@ def handle(choice: Choice):
             print("no question entered")
         return
     elif choice.id == "command":
-        print(">", choice.parameters["option"])
+        script = choice.parameters["option"]
+        confirmed = prompts.confirm_command(script, False)
+        if confirmed == prompts.GO_BACK:
+            return
+        elif confirmed == prompts.EXIT:
+            return
+        from promptops.query.query import Result
+        from promptops.query.query import run
+        run(Result(script=script, origin=choice.parameters["origin"]))
 
 
 def add_unstaged(files: list[str]):
