@@ -3,16 +3,15 @@ import logging
 import os
 import threading
 import random
-from typing import List, Optional
+import time
 
+import Levenshtein
 import requests
+from typing import List, Optional
 from promptops.query.dtos import Result
-
 from promptops.query.explanation import ReturningThread
-
 from promptops.query import messages
-
-from promptops import shells, settings, user, trace
+from promptops import shells, settings, user, trace, history
 from promptops.ui import selections, prompts
 
 
@@ -39,23 +38,78 @@ class SuffixTree:
             if root_cmd:
                 self.insert(lines[i:i+3])
 
-    def predict_next(self, command_sequence, embeddings=None):
-        entry = command_sequence[0]
-        if entry not in self.roots or len(command_sequence) < 1:
+
+    def close_enough_node(self, text):
+        def count_dicts(d):
+            if not isinstance(d, dict):
+                return 0
+            return 1 + sum(count_dicts(v) for v in d.values())
+
+        close = []
+        for s2 in self.roots.keys():
+            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3, score_cutoff=.85)
+            if score > 0 and count_dicts(self.roots[s2]) > 1:
+                close.append(self.roots[s2])
+        return close
+
+
+    @staticmethod
+    def closest_next(possible, text):
+        close = []
+        for s2 in possible:
+            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3)
+            if score > 0:
+                close.append((s2, score))
+        if len(close) == 0:
+            return None
+        return max(close, key=lambda x: x[1])[0]
+
+
+    def predict_next_close(self, command_sequence):
+        if len(command_sequence) < 1 or command_sequence[0] not in self.roots:
             return None
 
+        entry = command_sequence[0]
+        entry_node = self.roots[entry]
+
+        close = self.close_enough_node(entry)
+        possibilities = {}
+
+        def update(items):
+            for item in items:
+                possibilities[item] = possibilities.get(item, 0) + 1
+
+        for node in close:
+            if node == entry_node:
+                continue
+
+            for c, cmd in enumerate(command_sequence[1:]):
+                if cmd in node:
+                    node = node[cmd]['next']
+                else:
+                    possible_keys = [k for k in node.keys() if k != '$' and k != 'next']
+                    possible_node_cmd = self.closest_next(possible_keys, command_sequence[c])
+                    if possible_node_cmd:
+                        node = node[possible_node_cmd]['next']
+
+            update([k for k, v in node.items() if k != '$'])
+
+        return [cmd for cmd, freq in sorted(possibilities.items(), key=lambda x: x[1])]
+
+    def predict_next(self, command_sequence):
+        if len(command_sequence) < 1 or command_sequence[0] not in self.roots:
+            return None
+
+        entry = command_sequence[0]
         node = self.roots[entry]
 
         for c, cmd in enumerate(command_sequence[1:]):
             if cmd in node:
                 node = node[cmd]['next']
-            # elif embeddings:
-            #     embedding = embeddings[c + 1]
-            #     possible_keys = node.keys()
             else:
-                return None
+                continue
 
-        next_cmds = [(k, v['$']) for k, v in node.items() if k != '$']
+        next_cmds = [(k, v.get('$', 0)) for k, v in node.items() if k != '$']
         # sorting lowest to highest intentionally, we reverse later :)
         next_cmds.sort(key=lambda x: x[1])
 
@@ -78,49 +132,37 @@ def get_files():
     return files
 
 
-def suggest_next_suffix(count: int = 4) -> List[dict]:
+def suggest_next_suffix(count: int = 2) -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
     context.reverse()
 
     predictions = []
 
-    for i in range(1, 5):
+    for i in range(1, 6):
         prediction = suffix_tree.predict_next(context[:i])
         if prediction:
             predictions.extend(prediction)
             predictions.reverse()
 
-    return [{'option': p, 'origin': 'history'} for p in predictions][:count]
+    return [{'option': p, 'origin': 'history'} for p in predictions[:count]]
 
-#
-# def suggest_next_suffix_near(count: int = 2) -> List[dict]:
-#     context = shells.get_shell().get_recent_history(6)
-#     context.reverse()
-#     predictions = []
-#
-#     response = requests.post(
-#         settings.endpoint + "/embeddings",
-#         json={
-#             "trace_id": trace.trace_id,
-#             "batch": context,
-#         },
-#         headers={
-#             "user-agent": f"promptops-cli; user_id={user.user_id()}",
-#         },
-#     )
-#     embeddings = response.json()['result']
-#
-#     for i in range(1, 5):
-#         prediction = suffix_tree.predict_next(context[:i], embeddings)
-#         if prediction:
-#             predictions.extend(prediction)
-#             predictions.reverse()
-#
-#     return [{'option': p, 'origin': 'history'} for p in predictions][:count]
-#
+
+def suggest_next_suffix_near(count: int = 2) -> List[dict]:
+    context = shells.get_shell().get_recent_history(6)
+    context.reverse()
+    predictions = []
+
+    for i in range(1, 6):
+        prediction = suffix_tree.predict_next_close(context[:i])
+        if prediction:
+            predictions.extend(prediction)
+            predictions.reverse()
+
+    return [{'option': p, 'origin': 'history'} for p in predictions[:count]]
+
 
 def suggest_next_gpt() -> List[dict]:
-    context = shells.get_shell().get_recent_history(6)
+    context = shells.get_shell().get_recent_history(4)
     context.reverse()
     files = get_files()
 
@@ -140,10 +182,10 @@ def suggest_next_gpt() -> List[dict]:
         logging.debug("failed to get suggestion for the next command", response.status_code, response.json())
         return []
 
-    return [{'option': p, 'origin': 'promptops'} for p in response.json().get("options")]
+    return [{'option': p, 'origin': 'promptops'} for p in response.json().get("options")[:2]]
 
 
-ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨"}
+ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", 'other': 'close-enough'}
 
 
 def pretty_result(item):
@@ -162,12 +204,22 @@ def deduplicate(results: list[dict]):
 
 
 def suggest_next() -> Optional[Result]:
-    results = deduplicate(suggest_next_suffix())
-
-    task = ReturningThread(
-        suggest_next_gpt,
-        daemon=True,
-    )
+    results = []
+    tasks = [
+        ReturningThread(
+            suggest_next_suffix,
+            daemon=True
+        ),
+        ReturningThread(
+            suggest_next_gpt,
+            daemon=True,
+        ),
+        ReturningThread(
+            suggest_next_suffix_near,
+            daemon=True
+        )
+    ]
+    running = len(tasks)
 
     update_lock = threading.Lock()
 
@@ -177,15 +229,18 @@ def suggest_next() -> Optional[Result]:
     def done_callback(thread: ReturningThread):
         try:
             with update_lock:
+                nonlocal running
+                running = running - 1
                 results.extend(thread.result())
                 if ui:
                     options = [pretty_result(r) for r in deduplicate(results)]
-                    ui.reset_options(options, is_loading=False)
+                    ui.reset_options(options, running > 0)
         except Exception as exc:
             logging.exception(exc)
 
-    task.add_done_callback(done_callback)
-    task.start()
+    for task in tasks:
+        task.add_done_callback(done_callback)
+        task.start()
 
     index = ui.input()
     selected = results[index]
@@ -200,5 +255,4 @@ def suggest_next() -> Optional[Result]:
     elif selected == prompts.EXIT:
         raise KeyboardInterrupt()
 
-    print()
     return result
