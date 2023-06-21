@@ -249,3 +249,7 @@ class UI(object):
                 return self._selected
             elif key in self._actions:
                 self._actions[key](key, self)
+
+    @property
+    def is_active(self):
+        return self._is_active

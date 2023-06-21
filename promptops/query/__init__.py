@@ -1,1 +1,1 @@
-from .query import query_mode
+from .query import do_query

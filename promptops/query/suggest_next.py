@@ -157,7 +157,6 @@ def suggest_next() -> Optional[Result]:
     task.add_done_callback(done_callback)
     task.start()
 
-
     index = ui.input()
     selected = results[index]
 
