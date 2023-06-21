@@ -57,16 +57,8 @@ def entry_point():
         options.extend(instant_choices(3))
         options.append(Choice("query", "Ask a question", {}))
 
-        tasks = [
-            ReturningThread(generated_choices, daemon=True),
-        ]
-        num_running = Counter(len(tasks))
-        update_lock = threading.Lock()
 
-        ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=num_running.value > 0)
-        for task in tasks:
-            task.add_done_callback(done_callback(update_lock, ui, options, num_running))
-            task.start()
+        ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=False)
         selected = ui.input()
         print()
         try:
