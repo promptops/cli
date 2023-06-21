@@ -117,7 +117,7 @@ ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨"}
 
 
 def pretty_result(item):
-    return f'{ORIGIN_SYMBOLS["history"]} {item["option"]}'
+    return f'{ORIGIN_SYMBOLS[item["origin"]]} {item["option"]}'
 
 
 def deduplicate(results: list[dict]):
