@@ -56,7 +56,11 @@ class SuffixTree:
             if root_cmd:
                 self.insert(lines[i:i+self.max_depth])
 
+<<<<<<< HEAD
     def close_enough_node(self, text, cutoff=0.7):
+=======
+    def close_enough_node(self, text):
+>>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
         def count_dicts(d):
             if not isinstance(d, dict):
                 return 0
@@ -175,7 +179,11 @@ def suggest_next_suffix(count: int = 2) -> List[dict]:
     predictions = []
 
     for i in range(1, 6):
+<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next(context[-i:])
+=======
+        prediction = suffix_tree.predict_next(context[-i:])
+>>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
@@ -187,7 +195,11 @@ def suggest_next_suffix_near(count: int = 2) -> List[dict]:
     predictions = []
 
     for i in range(1, 6):
+<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next_close(context[-i:])
+=======
+        prediction = suffix_tree.predict_next_close(context[-i:])
+>>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
