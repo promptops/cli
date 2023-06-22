@@ -36,8 +36,14 @@ class Bash(Shell):
                 buffer = ""
         return commands
 
-
     def add_to_history(self, script):
         with open(os.path.expanduser(self.history_file), 'a') as f:
             f.write(script + '\n')
 
+    def get_config(self):
+        return """
+function um() {
+    command um $@
+    history -r ${HISTFILE:-~/.bash_history}
+}
+""".strip()

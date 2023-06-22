@@ -141,6 +141,9 @@ class Shell:
     def add_to_history(self, script):
         raise NotImplementedError()
 
+    def get_config(self):
+        raise NotImplementedError()
+
 
 class NoopShell(Shell):
     def _get_cmds_from_lines(self, history):
@@ -154,3 +157,9 @@ class NoopShell(Shell):
 
     def get_recent_history(self, look_back: int = 10):
         return []
+
+    def add_to_history(self, script):
+        pass
+
+    def get_config(self):
+        return "echo 'um: shell not supported'"

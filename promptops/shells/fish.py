@@ -52,8 +52,15 @@ class Fish(Shell):
                     logging.debug("UnicodeDecodeError at line: ", line)
         return scrub_lines(fname, list(reversed(commands)))
 
-
     def add_to_history(self, script):
         with open(os.path.expanduser(self.history_file), 'a') as history:
             entry = f'- cmd: {script}\n   when: {time.time()}\n'
             history.write(entry)
+
+    def get_config(self):
+        return """
+function um -d "your CLI assistant"
+    command um $argv
+    builtin history merge
+end
+""".strip()
