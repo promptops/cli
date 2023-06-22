@@ -31,7 +31,6 @@ class SuffixTree:
             if root_cmd:
                 self.insert(lines[i:i+3])
 
-
     def close_enough_node(self, text):
         def count_dicts(d):
             if not isinstance(d, dict):
@@ -45,7 +44,6 @@ class SuffixTree:
                 close.append(self.roots[s2])
         return close
 
-
     @staticmethod
     def closest_next(possible, text):
         close = []
@@ -56,7 +54,6 @@ class SuffixTree:
         if len(close) == 0:
             return None
         return max(close, key=lambda x: x[1])[0]
-
 
     def predict_next_close(self, command_sequence):
         if len(command_sequence) < 1 or command_sequence[0] not in self.roots:
@@ -87,7 +84,7 @@ class SuffixTree:
 
             update([k for k, v in node.items() if k != '$'])
 
-        return [cmd for cmd, freq in sorted(possibilities.items(), key=lambda x: x[1])]
+        return [cmd for cmd, freq in sorted(possibilities.items(), key=lambda x: x[1], reverse=True)]
 
     def predict_next(self, command_sequence):
         if len(command_sequence) < 1 or command_sequence[0] not in self.roots:
@@ -103,8 +100,7 @@ class SuffixTree:
                 continue
 
         next_cmds = [(k, v.get('$', 0)) for k, v in node.items() if k != '$']
-        # sorting lowest to highest intentionally, we reverse later :)
-        next_cmds.sort(key=lambda x: x[1])
+        next_cmds.sort(key=lambda x: x[1], reverse=True)
 
         return [cmd for cmd, freq in next_cmds]
 
@@ -127,28 +123,24 @@ def get_files():
 
 def suggest_next_suffix(count: int = 2) -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
-    context.reverse()
     predictions = []
 
     for i in range(1, 6):
-        prediction = suffix_tree.predict_next(context[:i])
+        prediction = suffix_tree.predict_next(context[-i:])
         if prediction:
-            predictions.extend(prediction)
-    predictions.reverse()
+            predictions = prediction + [p for p in predictions if p not in prediction]
 
     return [{'option': p, 'origin': 'history'} for p in predictions[:count]]
 
 
 def suggest_next_suffix_near(count: int = 2) -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
-    context.reverse()
     predictions = []
 
     for i in range(1, 6):
-        prediction = suffix_tree.predict_next_close(context[:i])
+        prediction = suffix_tree.predict_next_close(context[-i:])
         if prediction:
-            predictions.extend(prediction)
-    predictions.reverse()
+            predictions = prediction + [p for p in predictions if p not in prediction]
 
     return [{'option': p, 'origin': 'history'} for p in predictions[:count]]
 
