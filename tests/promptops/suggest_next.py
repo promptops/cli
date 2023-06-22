@@ -1,5 +1,6 @@
-import unittest
-from unittest.mock import Mock, patch, MagicMock
+import threading
+from unittest.mock import patch, MagicMock
+import contextlib
 
 history = [
     'cd ~/projects',
@@ -101,61 +102,49 @@ history = [
 ]
 
 
-class TestMyFunction(unittest.TestCase):
-
-    def setUp(self):
-        self.mock_shell = MagicMock()
-        self.mock_get_shell = MagicMock(return_value=self.mock_shell)
+_patch_lock = threading.Lock()
 
 
-    def setValue(self, v):
-        def side_effect(arg):
-            if arg == 1000:
-                return history + [v]
-            elif arg == 6:
-                return history + [v]
-            else:
-                return history
+@contextlib.contextmanager
+def patch_shell(recent_commands: list[str]):
+    mock_shell = MagicMock()
 
-        self.mock_shell.get_recent_history.side_effect = side_effect
+    def get_recent_history(n: int):
+        return (history + recent_commands)[-n:]
 
-
-    def test_git_commit_predict(self):
-        self.setValue('git commit -m "i just made a few changes"')
-
-        with patch('promptops.shells.get_shell', self.mock_get_shell):
-            from promptops.query.suggest_next import suggest_next_suffix_near
-
-            near = suggest_next_suffix_near()
-            print(near)
-
-        self.assertTrue(len(near) == 2)
+    mock_shell.get_recent_history.side_effect = get_recent_history
+    mock_get_shell = MagicMock(return_value=mock_shell)
+    with _patch_lock, patch('promptops.shells.get_shell', mock_get_shell):
+        yield mock_shell
 
 
-    def test_exact_predict(self):
-        self.setValue('terraform init')
+def test_git_commit_predict():
+    with patch_shell(['git commit -m "i just made a few changes"']):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+        near = suggest_next.suggest_next_suffix_near()
+        print(near)
 
-        with patch('promptops.shells.get_shell', self.mock_get_shell):
-            from promptops.query.suggest_next import suggest_next_suffix
-
-            exact = suggest_next_suffix()
-            print(exact)
-
-        self.assertTrue(any([x.get('option') == 'terraform plan' for x in exact]))
+    assert len(near) == 2
 
 
-    def another_one(self):
-        self.setValue('kubectl get services')
+def test_exact_predict():
+    with patch_shell(['terraform init']):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
 
-        with patch('promptops.shells.get_shell', self.mock_get_shell):
-            from promptops.query.suggest_next import suggest_next_suffix
+        exact = suggest_next.suggest_next_suffix()
+        print(exact)
 
-            exact = suggest_next_suffix(2)
-            print(exact)
-
-        self.assertTrue(any([x.get('option') == 'kubectl describe service my-service' for x in exact]))
-
+    assert any([x.get('option') == 'terraform plan' for x in exact])
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_another_one():
+    with patch_shell(['kubectl get services']):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+
+        exact = suggest_next.suggest_next_suffix(2)
+        print(exact)
+
+    assert any([x.get('option') == 'kubectl describe service my-service' for x in exact])
