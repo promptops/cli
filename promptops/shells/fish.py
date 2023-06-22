@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 from .base import Shell
 from .base import reverse_readline, accept_command
@@ -53,4 +54,6 @@ class Fish(Shell):
 
 
     def add_to_history(self, script):
-        subprocess.run(['fish', '-c', f'history --merge; history save; echo "{script}" | history --save'])
+        with open(os.path.expanduser(self.history_file), 'a') as history:
+            entry = f'- cmd: {script}\n   when: {time.time()}\n'
+            history.write(entry)
