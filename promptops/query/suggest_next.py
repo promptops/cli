@@ -32,10 +32,8 @@ def similarity(cmd1, cmd2):
 
 
 class SuffixTree:
-    def __init__(self, max_depth=3, history_count=1000):
+    def __init__(self):
         self.roots = {}
-        self.max_depth = max_depth
-        self.history_count = history_count
         self.build_tree()
 
     def insert(self, command_sequence):
@@ -50,21 +48,13 @@ class SuffixTree:
         node['$'] = node.get('$', 0) + 1
 
     def build_tree(self):
-        lines = shells.get_shell().get_recent_history(self.history_count)
+        lines = shells.get_shell().get_recent_history(1000)
         for i, line in enumerate(lines):
             root_cmd = line
             if root_cmd:
-                self.insert(lines[i:i+self.max_depth])
+                self.insert(lines[i:i+3])
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     def close_enough_node(self, text, cutoff=0.7):
-=======
-    def close_enough_node(self, text):
->>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
-=======
-    def close_enough_node(self, text, cutoff=0.7):
->>>>>>> e04cb78 (replace Levenshtein with thefuzz for command similarity)
         def count_dicts(d):
             if not isinstance(d, dict):
                 return 0
@@ -138,22 +128,6 @@ class SuffixTree:
 
         return [cmd for cmd, freq in next_cmds]
 
-    def find_repeated_sequences(self, min_repeats=2):
-        def _traverse(node, sequence):
-            if node.get('$', 0) >= min_repeats:
-                yield sequence
-            for string, child_node in node.items():
-                if string != '$':
-                    add_to_seq = [string] if string != 'next' else []
-                    yield from _traverse(child_node, sequence + add_to_seq)
-
-        repeated_sequences = []
-        for root_string, root_node in self.roots.items():
-            repeated_sequences.extend(_traverse(root_node, [root_string]))
-
-        return repeated_sequences
-
-
 
 suffix_tree = None
 
@@ -183,15 +157,7 @@ def suggest_next_suffix(count: int = 2) -> List[dict]:
     predictions = []
 
     for i in range(1, 6):
-<<<<<<< HEAD
-<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next(context[-i:])
-=======
-        prediction = suffix_tree.predict_next(context[-i:])
->>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
-=======
-        prediction = get_suffix_tree().predict_next(context[-i:])
->>>>>>> 357d196 (wip on workflow detectiopn & saving using suffix trees)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
@@ -203,15 +169,7 @@ def suggest_next_suffix_near(count: int = 2) -> List[dict]:
     predictions = []
 
     for i in range(1, 6):
-<<<<<<< HEAD
-<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next_close(context[-i:])
-=======
-        prediction = suffix_tree.predict_next_close(context[-i:])
->>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
-=======
-        prediction = get_suffix_tree().predict_next_close(context[-i:])
->>>>>>> 357d196 (wip on workflow detectiopn & saving using suffix trees)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
