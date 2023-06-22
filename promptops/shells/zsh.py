@@ -102,8 +102,14 @@ class Zsh(Shell):
             commands.append(buffer.lstrip("\n"))
         return commands
 
-
     def add_to_history(self, script):
         history_entry = ': {0}:{1};{2}\n'.format(int(time.time()), 0, script)
         with open(os.path.expanduser(self.history_file), 'a') as f:
             f.write(history_entry)
+
+    def get_config(self):
+        return """
+um() {
+    command um $@
+    fc -R ${HISTFILE:-~/.zsh_history}
+}""".strip()

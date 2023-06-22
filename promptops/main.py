@@ -55,6 +55,11 @@ def query_mode(args):
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if args.shell_config:
+        from promptops.shells import get_shell
+
+        print(get_shell().get_config())
+        sys.exit(0)
     settings.model = args.mode
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
@@ -143,7 +148,10 @@ def entry_alias():
     parser.add_argument("--version", action="store_true", help="print version and exit")
     parser.add_argument("--config", action="store_true", help="reconfigure")
     parser.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
+<<<<<<< HEAD
     parser.add_argument("--install", action="store_true", help="print install script")
+=======
+>>>>>>> e1ed276 (implement shell config option to install function which reloads history)
     parser.add_argument(
         "--history-context",
         default=settings.history_context,
@@ -269,6 +277,7 @@ def entry_main():
     parser_question.add_argument(
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
+    parser_question.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
     parser_question.add_argument("question", nargs=REMAINDER, help="the question to ask")
     parser_question.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_question.set_defaults(func=query_mode)
