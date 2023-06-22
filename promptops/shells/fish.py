@@ -67,3 +67,4 @@ end
 
     def _get_config_file(self):
         return "~/.config/fish/config.fish"
+
