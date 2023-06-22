@@ -1,10 +1,15 @@
 import subprocess
 import sys
 import threading
+import time
 from typing import Tuple
+
+from promptops.shells import get_shell
 
 
 def run_command(script, directory) -> Tuple[bool, str]:
+    start = time.time()
+
     def printer(pipe, func):
         for line in iter(pipe.readline, b''):
             line_decoded = line.decode()
@@ -31,6 +36,7 @@ def run_command(script, directory) -> Tuple[bool, str]:
     sys.stdout.flush()
 
     process.wait()
+    get_shell().add_to_history(script, start - time.time())
 
     return process.returncode == 0, "".join(stderr)
 

@@ -1,4 +1,5 @@
 import re
+import time
 
 from promptops.shells.base import Shell, accept_command, reverse_readline, readline
 from promptops.scrub_secrets import scrub_lines
@@ -100,3 +101,9 @@ class Zsh(Shell):
         if buffer != "" and not buffer.endswith("\\"):
             commands.append(buffer.lstrip("\n"))
         return commands
+
+
+    def add_to_history(self, script):
+        history_entry = ': {0}:{1};{2}\n'.format(int(time.time()), 0, script)
+        with open(os.path.expanduser(self.history_file), 'a') as f:
+            f.write(history_entry)

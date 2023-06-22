@@ -1,3 +1,5 @@
+import subprocess
+
 from .base import Shell
 from .base import reverse_readline, accept_command
 from promptops.scrub_secrets import scrub_lines
@@ -48,3 +50,7 @@ class Fish(Shell):
                 except UnicodeDecodeError:
                     logging.debug("UnicodeDecodeError at line: ", line)
         return scrub_lines(fname, list(reversed(commands)))
+
+
+    def add_to_history(self, script):
+        subprocess.run(['fish', '-c', f'history --merge; history save; echo "{script}" | history --save'])

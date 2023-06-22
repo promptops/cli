@@ -138,6 +138,9 @@ class Shell:
     def get_recent_history(self, look_back: int = 10):
         raise NotImplementedError()
 
+    def add_to_history(self, script):
+        raise NotImplementedError()
+
 
 class NoopShell(Shell):
     def _get_cmds_from_lines(self, history):

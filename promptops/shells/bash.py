@@ -35,3 +35,9 @@ class Bash(Shell):
                 commands.append(buffer.lstrip())
                 buffer = ""
         return commands
+
+
+    def add_to_history(self, script):
+        with open(os.path.expanduser(self.history_file), 'a') as f:
+            f.write(script + '\n')
+
