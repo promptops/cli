@@ -127,11 +127,10 @@ def get_files():
 
 def suggest_next_suffix(count: int = 2) -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
-    context.reverse()
     predictions = []
 
     for i in range(1, 6):
-        prediction = suffix_tree.predict_next(context[:i])
+        prediction = suffix_tree.predict_next(context[-i:])
         if prediction:
             predictions.extend(prediction)
     predictions.reverse()
@@ -141,11 +140,10 @@ def suggest_next_suffix(count: int = 2) -> List[dict]:
 
 def suggest_next_suffix_near(count: int = 2) -> List[dict]:
     context = shells.get_shell().get_recent_history(6)
-    context.reverse()
     predictions = []
 
     for i in range(1, 6):
-        prediction = suffix_tree.predict_next_close(context[:i])
+        prediction = suffix_tree.predict_next_close(context[-i:])
         if prediction:
             predictions.extend(prediction)
     predictions.reverse()
