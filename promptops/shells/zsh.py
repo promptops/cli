@@ -30,7 +30,7 @@ def unmetafy(cmd: bytes) -> (bytes, bytes):
 class Zsh(Shell):
     def __init__(self, history_file: str = None):
         if not history_file:
-            history_file = os.getenv("HISTFILE", "~/.zsh_history")
+            history_file = os.getenv("HISTFILE", os.path.join(os.getenv("ZDOTDIR", "~"), ".zsh_history"))
         super().__init__(history_file)
 
     def get_recent_history(self, look_back: int = 10):
@@ -118,42 +118,7 @@ um() {{
         done < {self.temp_history_file}
         rm {self.temp_history_file}
     fi
-}}
-
-setopt promptsubst
-autoload colors && colors
-autoload -Uz add-zsh-hook
-
-um_pre_exec() {{
-    PROMPTOPS_CURRENT_CMD=$1;
-}}
-
-add-zsh-hook preexec um_pre_exec
-
-um_pre_cmd() {{
-    export PROMPTOPS_LAST_COMMAND_RESULT=$?
-    if [[ -n "$PROMPTOPS_CURRENT_CMD" ]]; then
-        PROMPTOPS_CURRENT_CMD=;    
-        export PROMPTOPS_LAST_COMMAND=$(fc -ln -1)
-        export NEWLINE=$'\n'
-        if [[ $PROMPTOPS_LAST_COMMAND_RESULT -ne 0 ]]; then
-            echo $fg[red] "Last command failed with exit code $PROMPTOPS_LAST_COMMAND_RESULT: run 'um' to try to fix the command arguments" $fg[default]
-        fi
-    else
-        export PROMPTOPS_LAST_COMMAND=;
-        export PROMPTOPS_LAST_COMMAND_RESULT=0
-    fi
-}}
-
-add-zsh-hook precmd um_pre_cmd
-
-function check_um_workflows() {{
-    echo $fg[green] "Checking for um-compatible workflows"
-    um --scan
-}}
-
-check_um_workflows
-""".strip()
+}}""".strip()
 
     def _get_config_file(self):
-        return "~/.zshrc"
+        return os.path.join(os.getenv("ZDOTDIR", "~"), ".zshrc")

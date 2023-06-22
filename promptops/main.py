@@ -55,6 +55,11 @@ def query_mode(args):
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if args.shell_config:
+        from promptops.shells import get_shell
+
+        print(get_shell().get_config())
+        sys.exit(0)
     settings.model = args.mode
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
@@ -155,7 +160,6 @@ def entry_alias():
     parser.add_argument("--config", action="store_true", help="reconfigure")
     parser.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
     parser.add_argument("--install", action="store_true", help="print install script")
-
     parser.add_argument(
         "--history-context",
         default=settings.history_context,
