@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sys
-import time
 from dataclasses import dataclass
 from copy import copy
 import subprocess
@@ -59,7 +58,6 @@ def printer(pipe, func):
 
 def run(cmd: Result) -> (int, Optional[str]):
     if cmd.lang == "shell":
-        start = time.time()
         process = subprocess.Popen(
             cmd.script, shell=True, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
@@ -78,7 +76,7 @@ def run(cmd: Result) -> (int, Optional[str]):
         sys.stdout.flush()
 
         process.wait()
-        get_shell().add_to_history(cmd.script, start - time.time())
+        get_shell().add_to_history(cmd.script)
         history.add(scrub_secrets.scrub_line(".bash_history", cmd.script), process.returncode)
 
         return process.returncode, "".join(stderr)
