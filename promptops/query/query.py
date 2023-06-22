@@ -105,7 +105,7 @@ def make_revise_option():
     return "\x1b[3m💭️ don't see what you're looking for? try providing more context\x1b[0m"
 
 
-ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨"}
+ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚"}
 
 
 def ellipsis_if_needed(text, max_width, more="..."):
@@ -539,5 +539,5 @@ def content_to_result(content) -> Result:
     return Result(
         script=content["content"],
         lang="shell",
-        origin="promptops",
+        origin="curated",
     )

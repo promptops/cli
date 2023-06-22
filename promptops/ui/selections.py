@@ -2,6 +2,7 @@ import sys
 import time
 import threading
 import os
+import re
 import typing
 from promptops.loading.simple import loader
 from prompt_toolkit.formatted_text import to_plain_text, ANSI
@@ -186,7 +187,10 @@ class UI(object):
         return self._is_loading
 
     def _get_formatted_text(self, option: str, selected: bool):
-        return f"{colorama.Style.BRIGHT if selected else ''}{option}{colorama.Style.RESET_ALL}"
+        opt = "\n".join(
+                [(colorama.Fore.LIGHTYELLOW_EX if re.match("^. *#.*$", line) else colorama.Fore.LIGHTWHITE_EX) + line for line in option.split("\n")]
+        )
+        return f"{colorama.Style.BRIGHT if selected else ''}{opt}{colorama.Style.RESET_ALL}"
 
     def add_options(self, options, is_loading=False):
         if not self._is_active:
