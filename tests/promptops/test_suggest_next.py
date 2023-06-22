@@ -98,7 +98,6 @@ history = [
     'kubectl describe service my-service',
     'kubectl delete service my-service',
     'kubectl apply -f my-service.yaml',
-    'kubectl get services'
 ]
 
 
@@ -106,11 +105,13 @@ _patch_lock = threading.Lock()
 
 
 @contextlib.contextmanager
-def patch_shell(recent_commands: list[str]):
+def patch_shell(recent_commands: list[str], history_replacement: list[str] = None):
+    if history_replacement is None:
+        history_replacement = history
     mock_shell = MagicMock()
 
     def get_recent_history(n: int):
-        return (history + recent_commands)[-n:]
+        return (history_replacement + recent_commands)[-n:]
 
     mock_shell.get_recent_history.side_effect = get_recent_history
     mock_get_shell = MagicMock(return_value=mock_shell)
@@ -148,3 +149,34 @@ def test_another_one():
         print(exact)
 
     assert any([x.get('option') == 'kubectl describe service my-service' for x in exact])
+
+
+def test_simple():
+    values = [
+        "A", "B", "C",
+        "X", "Y", "Z",
+        "A", "B", "C",
+        "1", "B", "D",
+        "X", "Y", "Z",
+    ]
+
+    with patch_shell(["B"], values):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+
+        options = suggest_next.suggest_next_suffix(2)
+        assert [item["option"] for item in options] == ["C", "D"]
+
+    with patch_shell(["1", "B"], values):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+
+        options = suggest_next.suggest_next_suffix(2)
+        assert [item["option"] for item in options] == ["D", "C"]
+
+    with patch_shell(["A", "B"], values):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+
+        options = suggest_next.suggest_next_suffix(2)
+        assert [item["option"] for item in options] == ["C", "D"]
