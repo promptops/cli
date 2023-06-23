@@ -1,20 +1,23 @@
-requests==2.31.0
+requests~=2.31.0
 colorama~=0.4.6
-websockets~=11.0.2
+websockets~=11.0.3
 detect-secrets~=1.4.0
 prompt-toolkit~=3.0.38
-numpy~=1.24.3
+numpy~=1.25.0
 pyperclip~=1.8.2
 thefuzz~=0.19.0
 psutil~=5.9.5
 
 # extras for the local runner
-boto3==1.26.155
+boto3~=1.26.159
 kubernetes~=26.1.0
 
 # test dependencies
-pytest~=7.3.1
+pytest~=7.4.0
 pytest-asyncio~=0.21.0
-responses ~= 0.23.1
-pexpect
-pyte
+responses~=0.23.1
+pexpect~=4.8.0
+pyte~=0.8.1
+
+setuptools~=68.0.0
+wcwidth~=0.2.6
