@@ -180,3 +180,71 @@ def test_simple():
 
         options = suggest_next.suggest_next_suffix(2)
         assert [item["option"] for item in options] == ["C", "D"]
+
+
+def test_the_fuzz():
+    from thefuzz import fuzz
+    import shlex
+
+    commands = [
+        "git commit -m 'fixing build'",
+        "git commit -e -m 'i just made a few changes'",
+        "git commit",
+        "git pull --rebase",
+        "git push",
+        "git switch jj/issue-7",
+        "echo hello world",
+        "echo fixing build",
+    ]
+
+    def similarity(cmd1, cmd2):
+        tokens1 = shlex.split(cmd1)
+        tokens2 = shlex.split(cmd2)
+        if tokens1[0] != tokens2[0]:
+            return 0
+        # naive approach to weigh the tokens
+        max_multiplier = 3
+        m_tokens1 = []
+        for i, token in enumerate(tokens1[1:max_multiplier]):
+            m_tokens1.extend([token] * (max_multiplier - i))
+        m_tokens1.extend(tokens1[max_multiplier:])
+        m_tokens2 = []
+        for i, token in enumerate(tokens2[1:max_multiplier]):
+            m_tokens2.extend([token] * (max_multiplier - i))
+        m_tokens2.extend(tokens2[max_multiplier:])
+        return fuzz.ratio(m_tokens1, m_tokens2) / 100.0
+
+    test_commands = [
+        "git commit -m 'implement fuzzy matching'",
+        "git commit",
+        "git pull --rebase",
+        "git push",
+        "git switch feature-dtt",
+        "kubectl get pods",
+    ]
+
+    for cmd in test_commands:
+        print(cmd)
+        print("--- ratio ---")
+        similarities = [(command, similarity(cmd, command)) for command in commands]
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        for command, score in similarities:
+            print(f"  {score:.2f}: {command}")
+        try:
+            import Levenshtein
+            print("--- jaro winkler ---")
+            similarities = [(command, Levenshtein.jaro_winkler(cmd, command, prefix_weight=.25, score_cutoff=.80)) for command in commands]
+            similarities.sort(key=lambda x: x[1], reverse=True)
+            for command, score in similarities:
+                print(f"  {score:.2f}: {command}")
+        except ImportError:
+            pass
+
+
+def test_actual():
+    from promptops.shells.zsh import Zsh
+    with patch("promptops.shells.get_shell", MagicMock(return_value=Zsh())):
+        from promptops.query import suggest_next
+        suggest_next.suffix_tree = suggest_next.SuffixTree()
+        near = suggest_next.suggest_next_suffix_near()
+        print(near)
