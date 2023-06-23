@@ -62,7 +62,7 @@ def entry_point():
             handle(options[selected])
             print()
         except KeyboardInterrupt:
-            return
+            pass
 
 
 def done_callback(lock, ui: selections.UI, options: list[Choice], counter: Counter):
