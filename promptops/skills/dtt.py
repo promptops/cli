@@ -17,6 +17,7 @@ from promptops.ui import selections, prompts
 from promptops.gitaware.project import git_root
 from promptops.feedback import feedback
 from promptops.query.explanation import ReturningThread
+from promptops.shells import get_shell
 from .next import instant_choices
 from .choice import Choice
 
@@ -188,6 +189,7 @@ def add_unstaged(changes: list[Change], root: str):
         ui._is_active = False
     cmd = ["git", "add"] + [rel_file(change) for change, is_selected in zip(changes, selected_files) if is_selected]
     print(shlex.join(cmd))
+    get_shell().add_to_history(shlex.join(cmd))
     rc = subprocess.call(cmd)
     if rc != 0:
         print(f"git add failed with return code {rc}")
@@ -229,6 +231,7 @@ def commit_staged(changes: list[Change], root: str):
 
     cmd = ["git", "commit", "-e", "-m", options[selected]]
     print(shlex.join(cmd))
+    get_shell().add_to_history(shlex.join(cmd))
     rc = subprocess.call(cmd)
     if rc != 0:
         print(f"git commit failed with return code {rc}")
