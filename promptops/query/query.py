@@ -193,14 +193,31 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
     def update_results(extra):
         with update_lock:
             nonlocal num_running
+            nonlocal ui
             num_running -= 1
-            # TODO: deduplicate
             results.extend(extra)
+            options = [pretty_result(r) for r in deduplicate(results)]
+            if num_running == 0:
+                if len(results) == 0:
+                    feedback({"event": "no-results"})
+                    print("couldn't find any results, try rephrasing your question or providing more context")
+                    selected = prompts.confirm_clarify("")
+                    if selected == prompts.EXIT:
+                        raise KeyboardInterrupt()
+                    return ConfirmResult(question=selected, options=[])
+                options += [make_revise_option()]
             if ui:
-                options = [pretty_result(r) for r in results]
-                if num_running == 0:
-                    options += [make_revise_option()]
                 ui.reset_options(options, is_loading=num_running > 0)
+            else:
+                ui = selections.UI(
+                    options,
+                    num_running > 0,
+                    loading_text=random.choice(messages.QUERY),
+                    actions={
+                        "\x08": remove_entry,
+                        "\x7F": remove_entry,
+                    },
+                )
 
     def done_callback(thread: ReturningThread):
         try:
@@ -211,19 +228,6 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
     for task in tasks:
         task.add_done_callback(done_callback)
         task.start()
-
-    if len(results) == 0:
-        with loading_animation(Simple("thinking...")):
-            results = [r for t in tasks for r in t.join()]
-        num_running = 0
-        results = deduplicate(results)
-        if len(results) == 0:
-            feedback({"event": "no-results"})
-            print("couldn't find any results, try rephrasing your question or providing more context")
-            selected = prompts.confirm_clarify("")
-            if selected == prompts.EXIT:
-                raise KeyboardInterrupt()
-            return ConfirmResult(question=selected, options=[])
 
     def remove_entry(_, ui: selections.UI):
         with update_lock:
@@ -247,15 +251,18 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
             options = [pretty_result(r) for r in results]
             if num_running == 0:
                 options += [make_revise_option()]
-            ui = selections.UI(
-                options,
-                num_running > 0,
-                loading_text=random.choice(messages.QUERY),
-                actions={
-                    "\x08": remove_entry,
-                    "\x7F": remove_entry,
-                },
-            )
+            if ui:
+                ui.reset_options(options, is_loading=num_running > 0)
+            else:
+                ui = selections.UI(
+                    options,
+                    num_running > 0,
+                    loading_text=random.choice(messages.QUERY),
+                    actions={
+                        "\x08": remove_entry,
+                        "\x7F": remove_entry,
+                    },
+                )
         index = ui.input()
         print()
         if index == len(results):
