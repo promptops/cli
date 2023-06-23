@@ -1,0 +1,20 @@
+replace Levenshtein with thefuzz for command similarity
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# Author:    JJ <jj@ctrlstack.com>
+#
+# interactive rebase in progress; onto 6728f77
+# Last commands done (6 commands done):
+#    pick 086129c sync dependencies between requirements.txt and setup.py
+#    pick e04cb78 replace Levenshtein with thefuzz for command similarity
+# Next commands to do (17 remaining commands):
+#    pick db006cc 0.1.9 release
+#    pick 40ca2cb show version changes periodically if the running version is not latest
+# You are currently rebasing branch 'workflow-detection' on '6728f77'.
+#
+# Changes to be committed:
+#	modified:   promptops/query/suggest_next.py
+#	modified:   tests/promptops/test_suggest_next.py
+#
