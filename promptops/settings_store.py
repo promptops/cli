@@ -27,6 +27,7 @@ def load():
     settings.corrections_db_path = data.get("corrections_db_path", settings.corrections_db_path)
     settings.history_db_path = data.get("history_db_path", settings.history_db_path)
     settings.index_history = data.get("index_history", settings.index_history)
+    settings.gen_commit_message = data.get("gen_commit_message", settings.gen_commit_message)
 
 
 def _build_data():
@@ -37,6 +38,7 @@ def _build_data():
         "corrections_db_path": settings.corrections_db_path,
         "history_db_path": settings.history_db_path,
         "index_history": settings.index_history,
+        "gen_commit_message": settings.gen_commit_message,
     }
     if settings.endpoint != settings.DEFAULT_ENDPOINT:
         data["endpoint"] = settings.endpoint
