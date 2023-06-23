@@ -57,10 +57,14 @@ class SuffixTree:
                 self.insert(lines[i:i+self.max_depth])
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def close_enough_node(self, text, cutoff=0.7):
 =======
     def close_enough_node(self, text):
 >>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
+=======
+    def close_enough_node(self, text, cutoff=0.7):
+>>>>>>> e04cb78 (replace Levenshtein with thefuzz for command similarity)
         def count_dicts(d):
             if not isinstance(d, dict):
                 return 0

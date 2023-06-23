@@ -180,7 +180,6 @@ def test_simple():
 
         options = suggest_next.suggest_next_suffix(2)
         assert [item["option"] for item in options] == ["C", "D"]
-<<<<<<< HEAD
 
 
 def test_the_fuzz():
