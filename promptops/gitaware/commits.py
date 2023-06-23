@@ -3,12 +3,26 @@ import subprocess
 import logging
 
 
-def get_latest_commits(author=None, n=10):
+def get_latest_commits(*, author=None, n=5):
     """Get the latest commits from the git repo"""
     try:
         if author is None:
             author = subprocess.check_output(['git', 'config', 'user.name'], stderr=subprocess.STDOUT).decode('utf-8').strip()
-        commits = subprocess.check_output(['git', 'log', '--pretty=format:%s', '--author=' + author, '-n', str(n)], stderr=subprocess.STDOUT).decode('utf-8').strip().split('\n')
+        separator = '|||'
+        commit_lines = subprocess.check_output(['git', 'log', '--pretty=format:%B%n'+separator, '--author=' + author, '-n', str(n)], stderr=subprocess.STDOUT).decode('utf-8').strip().split('\n')
+        commits = []
+        buffer = ""
+        for line in commit_lines:
+            if line == separator:
+                buffer = buffer.strip()
+                if buffer:
+                    commits.append(buffer)
+                buffer = ""
+            else:
+                buffer += line + '\n'
+        buffer = buffer.strip()
+        if buffer:
+            commits.append(buffer)
         return commits
     except subprocess.CalledProcessError as e:
         logging.debug('return code: %d', e.returncode)

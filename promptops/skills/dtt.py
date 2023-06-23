@@ -44,7 +44,6 @@ def entry_point():
     while True:
         options = []
         if root := git_root():
-            cwd = os.getcwd()
             if changes := get_staged_files():
                 logging.debug("discovered staged changes: %s", changes)
                 options.append(Choice("commit_staged", f"✅ Commit staged changes [{len(changes)} changes] with generated commit message", {"changes": changes, "root": root}))
