@@ -55,11 +55,6 @@ def query_mode(args):
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-    if args.shell_config:
-        from promptops.shells import get_shell
-
-        print(get_shell().get_config())
-        sys.exit(0)
     settings.model = args.mode
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
