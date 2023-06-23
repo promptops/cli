@@ -46,12 +46,11 @@ setup(
         "pyperclip~=1.8.2",
         "thefuzz~=0.19.0",
         "psutil~=5.9.5",
-        "levenshtein~=0.21.1",
         "wcwidth~=0.2.6",
         "boto3~=1.26.159",
         "kubernetes~=26.1.0",
         "urllib3>=1.26,<2",  # kubernetes uses google-auth which has urllib3<2
-        "setuptools",
+        "setuptools~=68.0.0",
         "pip",
     ],
     entry_points="""

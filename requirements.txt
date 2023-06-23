@@ -20,4 +20,4 @@ responses~=0.23.1
 pexpect~=4.8.0
 pyte~=0.8.1
 
-setuptools~=61.0.0
+setuptools~=68.0.0
