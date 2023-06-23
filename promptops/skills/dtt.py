@@ -18,6 +18,7 @@ from promptops.gitaware.project import git_root
 from promptops.feedback import feedback
 from promptops.query.explanation import ReturningThread
 from promptops.shells import get_shell
+from promptops import settings, settings_store
 from .next import instant_choices
 from .choice import Choice
 
@@ -46,7 +47,7 @@ def entry_point():
         if root := git_root():
             if changes := get_staged_files():
                 logging.debug("discovered staged changes: %s", changes)
-                options.append(Choice("commit_staged", f"✅ Commit staged changes [{len(changes)} changes] with generated commit message", {"changes": changes, "root": root}))
+                options.append(Choice("commit_staged", f"✅ Commit staged changes [{len(changes)} changes]", {"changes": changes, "root": root}))
             if changes := get_unstaged_files():
                 logging.debug("discovered unstaged changes: %s", changes)
                 options.append(Choice("add_unstaged", f"⬆️  Add changes to staging area [{len(changes)} changes]", {"changes": changes, "root": root}))
@@ -206,29 +207,55 @@ def commit_staged(changes: list[Change], root: str):
         print("no changes")
         return
 
-    with loading_animation(Simple("Generating commit message...")):
-        options = get_commit_message(diff, get_latest_commits(n=10))
+    gen_commit_message = settings.gen_commit_message
+    if gen_commit_message is None:
+        print("Generate commit message? \033[3muses the diff, and the last few commit messages as examples\033[0m")
+        ui = selections.UI(
+            ["yes", "yes, and set default", "no"],
+            is_loading=False
+        )
+        try:
+            selected = ui.input()
+        except KeyboardInterrupt:
+            return
+        feedback({"event": "commit_message_prompt", "selected": selected})
+        if selected == 0:
+            gen_commit_message = True
+        elif selected == 1:
+            gen_commit_message = True
+            settings.gen_commit_message = True
+            settings_store.save()
+        elif selected == 2:
+            gen_commit_message = False
 
-    def open_diff():
-        subprocess.call(["git", "diff", "--staged"])
+        print()
 
-    ui = selections.UI(
-        options,
-        header="select commit message to use",
-        is_loading=False,
-        actions={
-            "d": lambda _, __: open_diff()
-        }, footer=" ".join([
-            selections.FOOTER_SECTIONS["select"],
-            f"{colorama.Style.BRIGHT}[d]{colorama.Style.RESET_ALL} view diff",
-            selections.FOOTER_SECTIONS["confirm"],
-            selections.FOOTER_SECTIONS["cancel"]
-        ])
-    )
-    selected = ui.input()
-    print(options[selected])
+    if gen_commit_message:
+        with loading_animation(Simple("Generating commit message...")):
+            options = get_commit_message(diff, get_latest_commits(n=10))
 
-    cmd = ["git", "commit", "-e", "-m", options[selected]]
+        def open_diff():
+            subprocess.call(["git", "diff", "--staged"])
+
+        ui = selections.UI(
+            options,
+            header="select commit message to use",
+            is_loading=False,
+            actions={
+                "d": lambda _, __: open_diff()
+            }, footer=" ".join([
+                selections.FOOTER_SECTIONS["select"],
+                f"{colorama.Style.BRIGHT}[d]{colorama.Style.RESET_ALL} view diff",
+                selections.FOOTER_SECTIONS["confirm"],
+                selections.FOOTER_SECTIONS["cancel"]
+            ])
+        )
+        selected = ui.input()
+        print(options[selected])
+
+        cmd = ["git", "commit", "-e", "-m", options[selected]]
+    else:
+        cmd = ["git", "commit", "-e"]
     print(shlex.join(cmd))
     get_shell().add_to_history(shlex.join(cmd))
     rc = subprocess.call(cmd)
