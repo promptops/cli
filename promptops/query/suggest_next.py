@@ -2,10 +2,33 @@ import fnmatch
 import logging
 import os
 
-import Levenshtein
 import requests
 from typing import List
 from promptops import shells, settings, user, trace
+import shlex
+from thefuzz import fuzz
+
+
+def similarity(cmd1, cmd2):
+    try:
+        tokens1 = shlex.split(cmd1)
+        tokens2 = shlex.split(cmd2)
+    except ValueError:
+        tokens1 = cmd1.strip().split()
+        tokens2 = cmd2.strip().split()
+    if tokens1[0] != tokens2[0]:
+        return 0
+    # naive approach to weigh the tokens
+    max_multiplier = 3
+    m_tokens1 = []
+    for i, token in enumerate(tokens1[1:max_multiplier]):
+        m_tokens1.extend([token] * (max_multiplier - i))
+    m_tokens1.extend(tokens1[max_multiplier:])
+    m_tokens2 = []
+    for i, token in enumerate(tokens2[1:max_multiplier]):
+        m_tokens2.extend([token] * (max_multiplier - i))
+    m_tokens2.extend(tokens2[max_multiplier:])
+    return fuzz.ratio(m_tokens1, m_tokens2) / 100.0
 
 
 class SuffixTree:
@@ -31,7 +54,7 @@ class SuffixTree:
             if root_cmd:
                 self.insert(lines[i:i+3])
 
-    def close_enough_node(self, text):
+    def close_enough_node(self, text, cutoff=0.7):
         def count_dicts(d):
             if not isinstance(d, dict):
                 return 0
@@ -39,17 +62,18 @@ class SuffixTree:
 
         close = []
         for s2 in self.roots.keys():
-            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3, score_cutoff=.80)
-            if score > 0 and count_dicts(self.roots[s2]) > 1:
-                close.append(self.roots[s2])
+            score = similarity(text, s2)
+            if score > cutoff:
+                if count_dicts(self.roots[s2]) > 1:
+                    close.append(self.roots[s2])
         return close
 
     @staticmethod
-    def closest_next(possible, text):
+    def closest_next(possible, text, cutoff=0.7):
         close = []
         for s2 in possible:
-            score = Levenshtein.jaro_winkler(text, s2, prefix_weight=.3)
-            if score > 0:
+            score = similarity(text, s2)
+            if score > cutoff:
                 close.append((s2, score))
         if len(close) == 0:
             return None
