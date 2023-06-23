@@ -156,10 +156,6 @@ class App:
                 self.options = [str(e)]
                 self._loading = False
                 self.render()
-            except Exception as e:
-                self.options = [str(e)]
-                self._loading = False
-                self.render()
 
     def render(self):
         with self._lock:
