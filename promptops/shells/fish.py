@@ -64,3 +64,6 @@ function um -d "your CLI assistant"
     builtin history merge
 end
 """.strip()
+
+    def _get_config_file(self):
+        return "~/.config/fish/config.fish"

@@ -37,7 +37,11 @@ pip3 install promptops
 
 # Configuration
 
-## Enable extended reverse search (Ctrl+E)
+```shell
+eval "$(um --install)"
+```
+
+## (Optional) Enable extended reverse search (Ctrl+E)
 
 Note: currently works only with Zsh
 

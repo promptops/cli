@@ -13,6 +13,12 @@ class Bash(Shell):
         fname = os.path.expanduser(self.history_file)
         buffer = ""
         commands = []
+        for line in reversed(self._get_added_history()):
+            if len(commands) >= look_back:
+                break
+            if accept_command(line):
+                commands.append(line)
+
         for line in reverse_readline(fname):
             if len(commands) >= look_back:
                 break
@@ -36,14 +42,18 @@ class Bash(Shell):
                 buffer = ""
         return commands
 
-    def add_to_history(self, script):
-        with open(os.path.expanduser(self.history_file), 'a') as f:
-            f.write(script + '\n')
-
     def get_config(self):
-        return """
-function um() {
+        return f"""
+function um() {{
     command um $@
-    history -r ${HISTFILE:-~/.bash_history}
-}
+    if [[ -f {self.temp_history_file} ]]; then
+        while IFS= read -r line; do
+            test -n "$line" && history -s "$line"
+        done < {self.temp_history_file}
+        rm {self.temp_history_file}
+    fi
+}}
 """.strip()
+
+    def _get_config_file(self):
+        return "~/.bashrc"

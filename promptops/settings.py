@@ -9,3 +9,4 @@ history_db_path = "~/.promptops/history.db"
 user_id_path = "~/.promptops/user_id"
 index_history: bool = False
 user_index_root = "~/.promptops/index"
+temp_history_file = "~/.promptops/temp_history"

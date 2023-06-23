@@ -1,6 +1,7 @@
 import re
 import os
 from promptops.scrub_secrets import scrub_lines
+from promptops import settings
 
 
 def _is_start_line(line):
@@ -118,14 +119,22 @@ def readline(filename, buf_size=8192, transform: callable = None):
             yield segment
 
 
+_extra_history = []
+
+
+def reset_extra_history():
+    _extra_history.clear()
+
+
 class Shell:
-    def __init__(self, history_file):
+    def __init__(self, history_file, temp_history_file=settings.temp_history_file):
         self.history_file = history_file
+        self.temp_history_file = temp_history_file
 
     def get_full_history(self):
         history = self._read_history_file()
         cmds = self._get_cmds_from_lines(history)
-        return scrub_lines(self.history_file, list(filter_commands(cmds)))
+        return scrub_lines(self.history_file, list(filter_commands(cmds + _extra_history)))
 
     def _read_history_file(self):
         fname = os.path.expanduser(self.history_file)
@@ -139,9 +148,41 @@ class Shell:
         raise NotImplementedError()
 
     def add_to_history(self, script):
-        raise NotImplementedError()
+        _extra_history.append(script)
+
+        tmp_history_file = os.path.expanduser(self.temp_history_file)
+        if not os.path.isdir(os.path.dirname(tmp_history_file)):
+            os.makedirs(os.path.dirname(tmp_history_file), exist_ok=True)
+
+        # replace special characters like new line with their escaped versions using backslash
+        escaped_script = script.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+        with open(tmp_history_file, 'a') as f:
+            f.write(escaped_script + "\n")
 
     def get_config(self):
+        raise NotImplementedError()
+
+    def _get_added_history(self):
+        return _extra_history
+
+    def install(self):
+        return f"""
+cp {self._get_config_file()} {self._get_config_file()}.um.bak
+grep -q "um --shell-config" {self._get_config_file()} && echo 'um is already configured' || echo 'eval "$(um --shell-config)"' >> {self._get_config_file()}
+source {self._get_config_file()}
+um
+""".strip()
+
+    def is_installed(self):
+        import subprocess
+        try:
+            subprocess.check_output(f"grep -q 'um --shell-config' {self._get_config_file()}", shell=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    def _get_config_file(self):
         raise NotImplementedError()
 
 
@@ -153,13 +194,23 @@ class NoopShell(Shell):
         super().__init__(None)
 
     def get_full_history(self):
-        return []
+        return scrub_lines("~/.bash_history", list(filter_commands(_extra_history)))
 
     def get_recent_history(self, look_back: int = 10):
-        return []
+        commands = list(filter_commands(_extra_history))[-look_back:]
+        return scrub_lines("~/.bash_history", commands)
 
     def add_to_history(self, script):
         pass
 
     def get_config(self):
         return "echo 'um: shell not supported'"
+
+    def install(self):
+        return "echo 'um: shell not supported'"
+
+    def _get_config_file(self):
+        return ""
+
+    def is_installed(self):
+        return True

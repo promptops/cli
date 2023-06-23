@@ -1,5 +1,4 @@
 import re
-import time
 
 from promptops.shells.base import Shell, accept_command, reverse_readline, readline
 from promptops.scrub_secrets import scrub_lines
@@ -38,6 +37,13 @@ class Zsh(Shell):
         fname = os.path.expanduser(self.history_file)
         buffer = ""
         commands = []
+
+        for line in reversed(self._get_added_history()):
+            if len(commands) >= look_back:
+                break
+            if accept_command(line):
+                commands.append(line)
+
         starting = True
         for line in reverse_readline(fname, transform=unmetafy):
             if starting and line == "":
@@ -70,7 +76,7 @@ class Zsh(Shell):
         fname = os.path.expanduser(self.history_file)
         lines = list(readline(fname, transform=unmetafy))
         commands = filter(accept_command, self._get_cmds_from_lines(lines))
-        return scrub_lines(fname, list(commands))
+        return scrub_lines(fname, list(commands) + list(filter(accept_command, self._get_added_history())))
 
     def _get_cmds_from_lines(self, lines):
         buffer = ""
@@ -102,14 +108,17 @@ class Zsh(Shell):
             commands.append(buffer.lstrip("\n"))
         return commands
 
-    def add_to_history(self, script):
-        history_entry = ': {0}:{1};{2}\n'.format(int(time.time()), 0, script)
-        with open(os.path.expanduser(self.history_file), 'a') as f:
-            f.write(history_entry)
-
     def get_config(self):
-        return """
-um() {
+        return f"""
+um() {{
     command um $@
-    fc -R ${HISTFILE:-~/.zsh_history}
-}""".strip()
+    if [[ -f {self.temp_history_file} ]]; then
+        while IFS= read -r line; do
+            test -n "$line" && print -s "$line"
+        done < {self.temp_history_file}
+        rm {self.temp_history_file}
+    fi
+}}""".strip()
+
+    def _get_config_file(self):
+        return "~/.zshrc"
