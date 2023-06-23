@@ -46,13 +46,13 @@ def entry_point():
             cwd = os.getcwd()
             if changes := get_staged_files():
                 logging.debug("discovered staged changes: %s", changes)
-                options.append(Choice("commit_staged", f"Commit staged changes [{len(changes)} changes]", {"changes": changes, "root": root}))
+                options.append(Choice("commit_staged", f"✅ Commit staged changes [{len(changes)} changes] with generated commit message", {"changes": changes, "root": root}))
             if changes := get_unstaged_files():
                 logging.debug("discovered unstaged changes: %s", changes)
-                options.append(Choice("add_unstaged", f"Add changes to staging area [{len(changes)} changes]", {"changes": changes, "root": root}))
+                options.append(Choice("add_unstaged", f"⬆️  Add changes to staging area [{len(changes)} changes]", {"changes": changes, "root": root}))
 
         options.extend(instant_choices(3))
-        options.append(Choice("query", "Ask a question", {}))
+        options.append(Choice("query", "💬 Ask a question", {}))
 
         ui = selections.UI([choice.text for choice in options], header="🤔 did you mean to...", is_loading=False)
         selected = ui.input()
