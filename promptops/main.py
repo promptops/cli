@@ -70,7 +70,7 @@ def query_mode(args):
             from promptops.skills import dtt
             dtt.entry_point()
     except KeyboardInterrupt:
-        return
+        pass
     if settings_store.is_changed():
         for _ in range(3):
             answer = input("save the current settings? [y/n]")
