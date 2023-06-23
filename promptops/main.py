@@ -83,10 +83,8 @@ def query_mode(args):
 
 
 def lookup_mode(args):
-    from promptops.feedback import feedback
     from promptops.query.lookup import entry_point as lookup_entry_point
 
-    feedback({"event": "lookup_mode"})
     lookup_entry_point(args)
 
 

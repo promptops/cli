@@ -252,6 +252,7 @@ def entry_point(args):
             return
         sys.exit(1)
 
+    feedback({"event": "lookup_mode"})
     # give us some space
     max_results = 10
     sys.stderr.write("\n"*(max_results + 1))
