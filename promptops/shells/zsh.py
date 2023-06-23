@@ -122,3 +122,4 @@ um() {{
 
     def _get_config_file(self):
         return os.path.join(os.getenv("ZDOTDIR", "~"), ".zshrc")
+
