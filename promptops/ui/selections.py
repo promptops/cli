@@ -31,7 +31,7 @@ class UI(object):
         header=""
     ):
         self._selected = 0
-        self._options = [o.replace("\n", "\n" + (" " * 6)) for o in options]
+        self._options = options
         self._is_loading = is_loading
         self._start = time.time()
         self._cursor = cursor
@@ -186,11 +186,13 @@ class UI(object):
     def is_loading(self):
         return self._is_loading
 
-    def _get_formatted_text(self, option: str, selected: bool):
+    @staticmethod
+    def _get_formatted_text(option: str, selected: bool):
         opt = "\n".join(
-                [(colorama.Fore.LIGHTYELLOW_EX if re.match("^. *#.*$", line) else colorama.Fore.LIGHTWHITE_EX) + line for line in option.split("\n")]
+                [(colorama.Fore.LIGHTYELLOW_EX if re.match("^. *#.*$", line) else colorama.Fore.LIGHTWHITE_EX) + line
+                 for line in option.split("\n")]
         )
-        return f"{colorama.Style.BRIGHT if selected else ''}{opt}{colorama.Style.RESET_ALL}"
+        return f"{colorama.Style.BRIGHT if selected else ''}{opt}{colorama.Style.RESET_ALL}".replace("\n", "\n      ")
 
     def add_options(self, options, is_loading=False):
         if not self._is_active:
