@@ -39,16 +39,22 @@ def runner_mode(args):
     entry_point()
 
 
+def check_if_installed():
+    from promptops.shells import get_shell
+    if not get_shell().is_installed():
+        from prompt_toolkit import print_formatted_text
+        from prompt_toolkit.formatted_text import HTML
+        print()
+        print_formatted_text(HTML("<ansired>Warning: um is not fully configured. To finish the installation, run:</ansired>"))
+        print_formatted_text(HTML("<ansigreen>  eval \"$(um --install)\"</ansigreen>"))
+        print()
+
+
 def query_mode(args):
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-    if args.shell_config:
-        from promptops.shells import get_shell
-
-        print(get_shell().get_config())
-        sys.exit(0)
     settings.model = args.mode
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
@@ -73,6 +79,7 @@ def query_mode(args):
                 break
             elif answer == "n":
                 break
+    check_if_installed()
 
 
 def lookup_mode(args):
@@ -133,6 +140,7 @@ def entry_alias():
     parser.add_argument("--version", action="store_true", help="print version and exit")
     parser.add_argument("--config", action="store_true", help="reconfigure")
     parser.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
+    parser.add_argument("--install", action="store_true", help="print install script")
     parser.add_argument(
         "--history-context",
         default=settings.history_context,
@@ -159,6 +167,16 @@ def entry_alias():
     parser.add_argument("question", nargs=REMAINDER, help="the question to ask")
     registered = user.has_registered()
     args = parser.parse_args()
+
+    if args.shell_config:
+        from promptops.shells import get_shell
+        print(get_shell().get_config())
+        sys.exit(0)
+    if args.install:
+        from promptops.shells import get_shell
+        print(get_shell().install())
+        sys.exit(0)
+
     if args.version:
         from promptops.version import __version__
 
@@ -166,6 +184,7 @@ def entry_alias():
         r = version_check.version_check()
         if not r.update_required:
             print("latest version:", r.latest_version)
+        check_if_installed()
         sys.exit(0)
 
     if args.verbose:
@@ -173,6 +192,7 @@ def entry_alias():
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
     version_check.version_check()
+
     if not registered or args.config:
         user.register()
         args.history_context = settings.history_context
@@ -240,6 +260,7 @@ def entry_main():
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
     parser_question.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
+    parser_question.add_argument("--install", action="store_true", help="print install script")
     parser_question.add_argument("question", nargs=REMAINDER, help="the question to ask")
     parser_question.set_defaults(func=query_mode)
 

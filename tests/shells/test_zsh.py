@@ -1,5 +1,6 @@
 import tempfile
 from promptops.shells.zsh import Zsh
+import pytest
 
 
 contents = b"""
@@ -51,6 +52,11 @@ expected = [
 ]
 
 
+def setup():
+    from promptops.shells.base import reset_extra_history
+    reset_extra_history()
+
+
 def test_zsh():
     with tempfile.NamedTemporaryFile() as tmp:
         with open(tmp.name, "wb") as f:
@@ -87,3 +93,40 @@ def test_zsh_simple():
 
         cmds = shell.get_full_history()
         assert cmds == expected
+
+
+def test_add_to_history():
+    from promptops import settings
+    with tempfile.NamedTemporaryFile() as tmp_hist, tempfile.NamedTemporaryFile() as tmp:
+        with open(tmp.name, "wb") as f:
+            f.write(contents)
+        settings.temp_history_file = tmp_hist.name
+        shell = Zsh(tmp.name)
+
+        cmds = shell.get_recent_history(4)
+        assert cmds == expected[-4:]
+
+        cmds = shell.get_full_history()
+        assert cmds == expected
+
+        extra_commands = [
+            "echo 'hello\nworld'",
+            "um say cheese",
+            "echo \"test\"",
+        ]
+
+        expected_extra = [
+            "echo 'hello\nworld'",
+            "echo \"test\"",
+        ]
+
+        for cmd in extra_commands:
+            shell.add_to_history(cmd)
+
+        cmds = shell.get_recent_history(1)
+        assert cmds == (expected + expected_extra)[-1:]
+        cmds = shell.get_recent_history(5)
+        assert cmds == (expected + expected_extra)[-5:]
+
+        cmds = shell.get_full_history()
+        assert cmds == (expected + expected_extra)
