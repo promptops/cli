@@ -1,7 +1,13 @@
+import json
+import logging
+import os
 import sys
 import threading
 import queue
 
+import requests
+
+from promptops import user, settings, trace
 from promptops.feedback import feedback
 
 from promptops.similarity import embedding
@@ -114,6 +120,12 @@ class App:
                 processor=lambda x: x["question"] if isinstance(x, dict) else x,
             )
             matches.extend([(r["corrected"], score) for r, score in corrected_matches])
+
+            curated_matches = lookup_curated(item)
+            for i, (match, score) in enumerate(curated_matches):
+                content = "\n".join([line for line in match.split("\n") if line and not line.startswith("#")])
+                matches.append(content, score)
+
             matches = [(match, score / 100) for match, score in matches]
             matches = sorted(matches, key=lambda x: x[1], reverse=True)
             # dedupe
@@ -263,3 +275,38 @@ def entry_point(args):
         sys.exit(1)
     sys.stdout.write(text)
     sys.stdout.flush()
+
+
+def lookup_curated(q: str) -> list[tuple[str, int]]:
+    req = {
+        "query": q,
+        "trace_id": trace.trace_id,
+        "platform": sys.platform,
+        "shell": os.environ.get("SHELL"),
+    }
+    logging.debug("curated query with request: %s", req)
+    response = requests.post(
+        settings.endpoint + "/curated",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
+    if response.status_code != 200:
+        # this exception completely destroys the ui
+        return []
+        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
+
+    data = response.json()
+    try:
+        return [(entry["content"]["content"], entry["score"] * 100) for entry in data["items"] if entry["score"] >= 0.75]
+    except KeyError:
+        logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
+
+    try:
+        message = data.get("message")
+    except KeyError:
+        message = "-"
+        logging.debug("no message in response: %s", json.dumps(data, indent=2))
+
+    return [(message, 0)]
