@@ -24,7 +24,7 @@ class Handler:
                 truncated = req.code.content.split("\n")[0]
                 if len(truncated) > 50:
                     truncated = truncated[:50] + "..."
-            logging.info(f"received {truncated}")
+            logging.info(f"<<< [{req.user_id or 'unknown'}] {truncated}")
             exec_request = self.make_exec_request(req)
             await self.process_mgr.queue(exec_request)
 

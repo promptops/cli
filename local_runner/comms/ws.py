@@ -5,8 +5,9 @@ import logging
 
 
 class Listener:
-    def __init__(self, handler: Callable):
+    def __init__(self, handler: Callable, is_role_level: bool = False):
         self.handler = handler
+        self.is_role_level = is_role_level
 
     async def listen(self, url: str, get_token: Callable):
         while True:
@@ -17,7 +18,8 @@ class Listener:
                         token = get_token()
                         await websocket.send(json.dumps({
                             "__action__": "authorize",
-                            "token": token
+                            "token": token,
+                            "role_level": self.is_role_level,
                         }))
                     try:
                         message = await websocket.recv()
@@ -30,6 +32,7 @@ class Listener:
                     if action:
                         if action == "authorization_success":
                             print("Ready")
+                            logging.info(f"registered for user: {data.get('__username__', 'unknown')}, tenant: {data.get('__tenant__', 'unknown')}, role: {data.get('__role__', 'unknown')}")
                             auth_needed = False
                         elif action in ["no_authorization", "authorization_failure"]:
                             raise ValueError(f"{action}: {data.get('__text__')}")

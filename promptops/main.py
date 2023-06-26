@@ -36,7 +36,7 @@ def runner_mode(args):
     from local_runner.main import entry_point
 
     feedback({"event": "runner_mode"})
-    entry_point()
+    entry_point(args)
 
 
 def check_if_installed():
@@ -266,6 +266,7 @@ def entry_main():
     parser_question.set_defaults(func=query_mode)
 
     parser_runner = subparsers.add_parser("runner", help="run commands from slack")
+    parser_runner.add_argument("--role-level", action="store_true", help="register as role-level runner")
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")

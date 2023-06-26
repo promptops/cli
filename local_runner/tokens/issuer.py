@@ -51,7 +51,7 @@ class Issuer:
         }
         headers = {"Content-Type": "application/json"}
 
-        response = self.http_client.post(self.auth_url, json=payload, headers=headers)
+        response = requests.post(self.auth_url, json=payload, headers=headers)
         response.raise_for_status()
         jwt = response.json().get("JWT")
         if not jwt:
