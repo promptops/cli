@@ -28,6 +28,7 @@ class Request:
     block_index: int
     code: Code
     state_service_url: str
+    user_id: str = None
 
     def to_dict(self):
         return {
@@ -36,6 +37,7 @@ class Request:
             "blockIndex": self.block_index,
             "code": self.code.to_dict(),
             "stateServiceUrl": self.state_service_url,
+            "userId": self.user_id,
         }
 
     @staticmethod
@@ -46,6 +48,7 @@ class Request:
             block_index=d.get("blockIndex", 0),
             code=Code.from_dict(d.get("code", {})),
             state_service_url=d.get("stateServiceUrl", ""),
+            user_id=d.get("userId"),
         )
 
 
