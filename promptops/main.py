@@ -235,6 +235,7 @@ def entry_main():
     parser.add_argument("--version", action="store_true", help="print version and exit")
     parser.add_argument("--verbose", "-v", action="store_true", help="verbose output")
     parser.add_argument("--config", action="store_true", help="reconfigure")
+    parser.add_argument("--skip-config", action="store_true", help="skips initial configuration and uses defaults")
     subparsers = parser.add_subparsers()
     parser_question = subparsers.add_parser("query", help="ask questions")
     parser_question.add_argument(
@@ -319,10 +320,10 @@ def entry_main():
         return
 
     version_check.version_check()
-    if not registered:
+    if not registered and not args.skip_config:
         user.register()
         args.history_context = settings.history_context
-    else:
+    elif not args.skip_config:
         from promptops import history
 
         history.update_history()
