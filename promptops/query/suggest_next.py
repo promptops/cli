@@ -184,10 +184,14 @@ def suggest_next_suffix(count: int = 2) -> List[dict]:
 
     for i in range(1, 6):
 <<<<<<< HEAD
+<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next(context[-i:])
 =======
         prediction = suffix_tree.predict_next(context[-i:])
 >>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
+=======
+        prediction = get_suffix_tree().predict_next(context[-i:])
+>>>>>>> 357d196 (wip on workflow detectiopn & saving using suffix trees)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
@@ -200,10 +204,14 @@ def suggest_next_suffix_near(count: int = 2) -> List[dict]:
 
     for i in range(1, 6):
 <<<<<<< HEAD
+<<<<<<< HEAD
         prediction = get_suffix_tree().predict_next_close(context[-i:])
 =======
         prediction = suffix_tree.predict_next_close(context[-i:])
 >>>>>>> 8d5fa1d (fix prediction logic in suggest_next and add simple test)
+=======
+        prediction = get_suffix_tree().predict_next_close(context[-i:])
+>>>>>>> 357d196 (wip on workflow detectiopn & saving using suffix trees)
         if prediction:
             predictions = prediction + [p for p in predictions if p not in prediction]
 
