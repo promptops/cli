@@ -79,7 +79,7 @@ def lookup_mode(args):
 
 
 def recipe_mode(args):
-    from promptops.recipes.creation import recipe_entrypoint
+    from promptops.recipes.entrypoint import recipe_entrypoint
     recipe_entrypoint(args)
 
 
@@ -127,6 +127,8 @@ def entry_alias():
     parser.add_argument("--verbose", "-v", action="store_true", help="verbose output")
     parser.add_argument("--version", action="store_true", help="print version and exit")
     parser.add_argument("--config", action="store_true", help="reconfigure")
+    parser.add_argument("--shell-config", action="store_true", help="print configuration for your shell")
+    parser.add_argument("--install", action="store_true", help="print install script")
     parser.add_argument(
         "--history-context",
         default=settings.history_context,
@@ -153,6 +155,16 @@ def entry_alias():
     parser.add_argument("question", nargs=REMAINDER, help="the question to ask")
     registered = user.has_registered()
     args = parser.parse_args()
+
+    if args.shell_config:
+        from promptops.shells import get_shell
+        print(get_shell().get_config())
+        sys.exit(0)
+    if args.install:
+        from promptops.shells import get_shell
+        print(get_shell().install())
+        sys.exit(0)
+
     if args.version:
         from promptops.version import __version__
 
@@ -160,6 +172,7 @@ def entry_alias():
         r = version_check.version_check()
         if not r.update_required:
             print("latest version:", r.latest_version)
+        check_if_installed()
         sys.exit(0)
 
     if args.verbose:
@@ -167,6 +180,7 @@ def entry_alias():
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
     version_check.version_check()
+
     if not registered or args.config:
         user.register()
         args.history_context = settings.history_context
@@ -177,7 +191,15 @@ def entry_alias():
 
     if args.question and len(args.question) > 0:
         if args.question[0] == 'workflow' or args.question[0] == 'recipe':
-            return recipe_mode(args)
+            subparser = ArgumentParser(
+                prog=f"{alias} recipe",
+                usage=f"{alias} recipe [prompt]",
+                description=f"{alias} create and manage recipes",
+            )
+            subparser.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
+            subparser.add_argument("question", nargs=REMAINDER, help="the question to ask")
+            sub_args = subparser.parse_args(args.question[1:])
+            return recipe_mode(sub_args)
         elif args.question[0] == 'index':
             # index subcommand
             subparser = ArgumentParser(
@@ -191,7 +213,6 @@ def entry_alias():
             sub_args = subparser.parse_args(args.question[1:])
             return index_mode(sub_args)
     query_mode(args)
-
 
 def entry_main():
     # Set the global exception handler
@@ -240,6 +261,7 @@ def entry_main():
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
+    parser_workflow.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
     parser_workflow.set_defaults(func=recipe_mode)
 
