@@ -137,7 +137,7 @@ um_pre_cmd() {{
         export PROMPTOPS_LAST_COMMAND=$(fc -ln -1)
         export NEWLINE=$'\n'
         if [[ $PROMPTOPS_LAST_COMMAND_RESULT -ne 0 ]]; then
-            echo $fg[lightred] "Last command failed with exit code $PROMPTOPS_LAST_COMMAND_RESULT: run 'um' to try to fix the command arguments" $fg[default]
+            echo $fg[red] "Last command failed with exit code $PROMPTOPS_LAST_COMMAND_RESULT: run 'um' to try to fix the command arguments" $fg[default]
         fi
     else
         export PROMPTOPS_LAST_COMMAND=;
