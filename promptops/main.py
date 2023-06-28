@@ -66,6 +66,10 @@ def query_mode(args):
     last_command_result = os.environ.get("PROMPTOPS_LAST_COMMAND_RESULT")
     last_command = os.environ.get("PROMPTOPS_LAST_COMMAND")
 
+    if args.scan:
+        from promptops.query.detect import detect_workflows
+        detect_workflows()
+
     question = " ".join(args.question)
     if not question.strip() and last_command_result != "0" and last_command:
         question = last_command
@@ -290,7 +294,6 @@ def entry_main():
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
-    parser_workflow.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
     parser_workflow.set_defaults(func=recipe_mode)
 
