@@ -39,6 +39,17 @@ def runner_mode(args):
     entry_point()
 
 
+def check_if_installed():
+    from promptops.shells import get_shell
+    if not get_shell().is_installed():
+        from prompt_toolkit import print_formatted_text
+        from prompt_toolkit.formatted_text import HTML
+        print()
+        print_formatted_text(HTML("<ansired>Warning: um is not fully configured. To finish the installation, run:</ansired>"))
+        print_formatted_text(HTML("<ansigreen>  eval \"$(um --install)\"</ansigreen>"))
+        print()
+
+
 def query_mode(args):
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -47,6 +58,10 @@ def query_mode(args):
     settings.model = args.mode
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
+
+    if args.scan:
+        from promptops.query.detect import detect_workflows
+        detect_workflows()
 
     question = " ".join(args.question)
     try:
@@ -152,6 +167,7 @@ def entry_alias():
     parser.add_argument(
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
+    parser.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser.add_argument("question", nargs=REMAINDER, help="the question to ask")
     registered = user.has_registered()
     args = parser.parse_args()
@@ -196,7 +212,6 @@ def entry_alias():
                 usage=f"{alias} recipe [prompt]",
                 description=f"{alias} create and manage recipes",
             )
-            subparser.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
             subparser.add_argument("question", nargs=REMAINDER, help="the question to ask")
             sub_args = subparser.parse_args(args.question[1:])
             return recipe_mode(sub_args)
@@ -255,13 +270,13 @@ def entry_main():
         "--mode", default=settings.model, choices=["fast", "accurate"], help="fast or accurate (default: %(default)s)"
     )
     parser_question.add_argument("question", nargs=REMAINDER, help="the question to ask")
+    parser_question.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_question.set_defaults(func=query_mode)
 
     parser_runner = subparsers.add_parser("runner", help="run commands from slack")
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
-    parser_workflow.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
     parser_workflow.set_defaults(func=recipe_mode)
 

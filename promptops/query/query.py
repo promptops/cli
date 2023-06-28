@@ -109,7 +109,7 @@ def make_revise_option():
     return "\x1b[3m💭️ don't see what you're looking for? try providing more context\x1b[0m"
 
 
-ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚"}
+ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚", "workflows": "tbd"}
 
 
 def ellipsis_if_needed(text, max_width, more="..."):
@@ -184,6 +184,13 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         ),
         ReturningThread(
             curated,
+            kwargs=dict(
+                q=questions[-1],
+            ),
+            daemon=True,
+        ),
+        ReturningThread(
+            check_workflows,
             kwargs=dict(
                 q=questions[-1],
             ),
@@ -544,4 +551,46 @@ def content_to_result(content) -> Result:
         script=content["content"],
         lang="shell",
         origin="curated",
+    )
+
+
+def check_workflows(*, q: str) -> list[Result]:
+    print("workflows")
+    req = {
+        "query": q,
+        "trace_id": trace.trace_id,
+    }
+    logging.debug("curated query with request: %s", req)
+    response = requests.post(
+        settings.endpoint + "/workflows/search",
+        json=req,
+        headers={
+            "user-agent": f"promptops-cli; user_id={user.user_id()}",
+        },
+    )
+    if response.status_code != 200:
+        # this exception completely destroys the ui
+        return []
+        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
+
+    data = response.json().get("results", [])
+    print(len(data))
+
+    if len(data) > 2:
+        data = data[:2]
+
+    try:
+        return [workflow_to_result(wf) for wf in data]
+    except KeyError:
+        logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
+
+    return []
+
+
+def workflow_to_result(workflow) -> Result:
+    return Result(
+        script=" && ".join(workflow.get("commands", [])).strip(),
+        lang="shell",
+        origin="workflows",
+        explanation="Detected workflow for: " + workflow.get("description", "")
     )

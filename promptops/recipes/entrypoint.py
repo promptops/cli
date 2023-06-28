@@ -395,10 +395,6 @@ def available_recipes():
 
 def recipe_entrypoint(args):
     last = "recipe-entrypoint"
-    if args.scan:
-        from promptops.recipes.detect import detect_recipes
-        detect_recipes()
-        return
     try:
         new_recipe = True
         if not args or len(args.question) < 2:
