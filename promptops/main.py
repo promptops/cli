@@ -63,7 +63,12 @@ def query_mode(args):
         from promptops.query.detect import detect_workflows
         detect_workflows()
 
+    last_command_result = os.environ.get("PROMPTOPS_LAST_COMMAND_RESULT")
+    last_command = os.environ.get("PROMPTOPS_LAST_COMMAND")
+
     question = " ".join(args.question)
+    if not question.strip() and last_command_result != "0" and last_command:
+        question = last_command
     try:
         if question.strip():
             feedback({"event": "query_mode"})
