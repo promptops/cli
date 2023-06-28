@@ -2,6 +2,7 @@ import base64
 import json
 import requests
 import threading
+from requests.adapters import HTTPAdapter
 from datetime import datetime, timedelta
 from local_runner.creds import Creds
 
@@ -11,7 +12,6 @@ class Issuer:
         self.creds = creds
         self.token = ""
         self.token_expires = datetime.min
-        self.http_client = requests.Session()
         self.auth_url = "https://authorization-tokens.global.ctrlstack.com/token"
         self.max_refresh_interval = timedelta(hours=1)
         self.mx = threading.Lock()
@@ -51,7 +51,9 @@ class Issuer:
         }
         headers = {"Content-Type": "application/json"}
 
-        response = requests.post(self.auth_url, json=payload, headers=headers)
+        session = requests.Session()
+        session.mount("https://", HTTPAdapter(max_retries=3))
+        response = session.post(self.auth_url, json=payload, headers=headers)
         response.raise_for_status()
         jwt = response.json().get("JWT")
         if not jwt:
