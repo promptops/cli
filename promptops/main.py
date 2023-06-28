@@ -224,7 +224,6 @@ def entry_alias():
                 usage=f"{alias} recipe [prompt]",
                 description=f"{alias} create and manage recipes",
             )
-            subparser.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
             subparser.add_argument("question", nargs=REMAINDER, help="the question to ask")
             sub_args = subparser.parse_args(args.question[1:])
             return recipe_mode(sub_args)
@@ -297,7 +296,6 @@ def entry_main():
     parser_runner.set_defaults(func=runner_mode)
 
     parser_workflow = subparsers.add_parser("recipe", help="run a complex or multi-stepped script")
-    parser_workflow.add_argument("--scan", help="scan for existing workflows", action="store_true", default=False)
     parser_workflow.add_argument("question", nargs=REMAINDER, help="the question to generate scripts for")
     parser_workflow.set_defaults(func=recipe_mode)
 
