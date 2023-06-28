@@ -118,7 +118,36 @@ um() {{
         done < {self.temp_history_file}
         rm {self.temp_history_file}
     fi
-}}""".strip()
+}}
+
+setopt promptsubst
+autoload colors && colors
+autoload -Uz add-zsh-hook
+
+um_pre_exec() {{
+    PROMPTOPS_CURRENT_CMD=$1;
+}}
+
+add-zsh-hook preexec um_pre_exec
+
+um_pre_cmd() {{
+    export PROMPTOPS_LAST_COMMAND_RESULT=$?
+    if [[ -n "$PROMPTOPS_CURRENT_CMD" ]]; then
+        PROMPTOPS_CURRENT_CMD=;    
+        export PROMPTOPS_LAST_COMMAND=$(fc -ln -1)
+        export NEWLINE=$'\n'
+        if [[ $PROMPTOPS_LAST_COMMAND_RESULT -ne 0 ]]; then
+            echo $fg[lightred] "Last command failed with exit code $PROMPTOPS_LAST_COMMAND_RESULT: run 'um' to try to fix the command arguments" $fg[default]
+        fi
+    else
+        export PROMPTOPS_LAST_COMMAND=;
+        export PROMPTOPS_LAST_COMMAND_RESULT=0
+    fi
+}}
+
+add-zsh-hook precmd um_pre_cmd
+
+""".strip()
 
     def _get_config_file(self):
         return os.path.join(os.getenv("ZDOTDIR", "~"), ".zshrc")
