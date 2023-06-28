@@ -48,11 +48,35 @@ def config_flow() -> dict:
 
     options = ["continue", "skip"]
     ui = selections.UI(options, is_loading=False)
-    selection = ui.input()
-    if selection == 1:
+    try:
+        selection = ui.input()
+        if selection == 1:
+            return config_selections
+    except KeyboardInterrupt:
+        print()
+        print("  skipping configuration")
+        print()
         return config_selections
 
     print()
+
+    try:
+        config_selections = collect_config()
+        print()
+        print("  🎉 all done! 🎉")
+        print()
+    except KeyboardInterrupt:
+        print()
+        print("  🚫 cancelled")
+        print()
+        return config_selections
+
+    return config_selections
+
+
+def collect_config():
+    config_selections = {}
+
     print()
     print("  📖 indexing your history can greatly improve the speed and the quality of the suggestions")
     print_formatted_text(
@@ -119,10 +143,6 @@ def config_flow() -> dict:
             settings_store.set_history_context(int(choice))
             config_selections["context_size"] = int(choice)
             break
-
-    print()
-    print("  🎉 all done! 🎉")
-    print()
 
     return config_selections
 
