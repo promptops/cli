@@ -195,7 +195,8 @@ def entry_alias():
     version_check.version_check()
 
     if not registered or args.config:
-        user.register()
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            user.register()
         args.history_context = settings.history_context
     else:
         from promptops import history
@@ -300,7 +301,8 @@ def entry_main():
                 print("latest version:", r.latest_version)
             sys.exit(0)
         if args.config:
-            user.register()
+            if sys.stdin.isatty() and sys.stdout.isatty():
+                user.register()
             args.history_context = settings.history_context
             sys.exit(0)
 
@@ -321,7 +323,8 @@ def entry_main():
 
     version_check.version_check()
     if not registered and not args.skip_config:
-        user.register()
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            user.register()
         args.history_context = settings.history_context
     elif not args.skip_config:
         from promptops import history
