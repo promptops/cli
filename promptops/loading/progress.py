@@ -6,38 +6,26 @@ import queue
 class ProgressSpinner:
     def __init__(self, total):
         self.total = total
-        self.queue = queue.Queue()
         self.current = 0
-        self.thread = threading.Thread(target=self.__progress_spinner, args=(self.total, self.queue))
-        self.thread.start()
+        self._finished = False
 
     def increment(self, completed):
         self.current += completed
-        self.queue.put(self.current)
-        if self.current >= self.total:
-            self.thread.join()
+        self._update()
 
     def set(self, completed):
-        self.queue.put(completed)
         self.current = completed
-        if completed >= self.total:
-            self.thread.join()
+        self._update()
 
-    @staticmethod
-    def __progress_spinner(total, completed_queue):
-        completed = min(completed_queue.get(), total)
-        percent = completed / total
+    def _update(self):
+        if self._finished:
+            return
+        completed = min(self.current, self.total)
+        percent = completed / self.total
         sys.stdout.write("\rProgress: [{0:50s}] {1:.1f}%".format("#" * int(percent * 50), percent * 100))
         sys.stdout.flush()
 
-        while True:
-            completed = min(completed_queue.get(), total)
-            percent = completed / total
-            sys.stdout.write("\rProgress: [{0:50s}] {1:.1f}%".format("#" * int(percent * 50), percent * 100))
+        if completed >= self.total:
+            sys.stdout.write("\n")
             sys.stdout.flush()
-
-            if completed >= total:
-                sys.stdout.write("\n")
-                sys.stdout.flush()
-                break
-
+            self._finished = True
