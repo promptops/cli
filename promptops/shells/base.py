@@ -1,5 +1,6 @@
 import re
 import os
+from abc import ABC, abstractmethod
 from promptops.scrub_secrets import scrub_lines
 from promptops import settings
 
@@ -126,10 +127,26 @@ def reset_extra_history():
     _extra_history.clear()
 
 
-class Shell:
+class Shell(ABC):
     def __init__(self, history_file, temp_history_file=settings.temp_history_file):
         self.history_file = history_file
         self.temp_history_file = temp_history_file
+
+    @abstractmethod
+    def get_recent_history(self, look_back: int = 10):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def _get_cmds_from_lines(self, history):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_config(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def _get_config_file(self):
+        raise NotImplementedError()
 
     def get_full_history(self):
         history = self._read_history_file()
@@ -140,12 +157,6 @@ class Shell:
         fname = os.path.expanduser(self.history_file)
         with open(fname, "r", encoding="utf-8", errors="ignore") as f:
             return [line.strip() for line in f if line.strip() != ""]
-
-    def _get_cmds_from_lines(self, history):
-        raise NotImplementedError()
-
-    def get_recent_history(self, look_back: int = 10):
-        raise NotImplementedError()
 
     def add_to_history(self, script):
         _extra_history.append(script)
@@ -160,16 +171,12 @@ class Shell:
         with open(tmp_history_file, 'a') as f:
             f.write(escaped_script + "\n")
 
-    def get_config(self):
-        raise NotImplementedError()
-
     def _get_added_history(self):
         return _extra_history
 
     def install(self):
         return f"""
-cp {self._get_config_file()} {self._get_config_file()}.um.bak
-grep -q "um --shell-config" {self._get_config_file()} && echo 'um is already configured' || echo 'eval "$(um --shell-config)"' >> {self._get_config_file()}
+grep -qx 'eval "$(um --shell-config)"' {self._get_config_file()} && echo 'um is already configured' || {{ cp {self._get_config_file()} {self._get_config_file()}.um.bak && echo 'eval "$(um --shell-config)"' >> {self._get_config_file()} }}
 source {self._get_config_file()}
 um
 """.strip()
@@ -182,35 +189,32 @@ um
         except subprocess.CalledProcessError:
             return False
 
-    def _get_config_file(self):
-        raise NotImplementedError()
-
 
 class NoopShell(Shell):
-    def _get_cmds_from_lines(self, history):
-        pass
-
     def __init__(self):
         super().__init__(None)
-
-    def get_full_history(self):
-        return scrub_lines("~/.bash_history", list(filter_commands(_extra_history)))
 
     def get_recent_history(self, look_back: int = 10):
         commands = list(filter_commands(_extra_history))[-look_back:]
         return scrub_lines("~/.bash_history", commands)
 
-    def add_to_history(self, script):
+    def _get_cmds_from_lines(self, history):
         pass
 
     def get_config(self):
         return "echo 'um: shell not supported'"
 
+    def _get_config_file(self):
+       return ""
+
+    def get_full_history(self):
+        return scrub_lines("~/.bash_history", list(filter_commands(_extra_history)))
+
+    def add_to_history(self, script):
+        pass
+
     def install(self):
         return "echo 'um: shell not supported'"
-
-    def _get_config_file(self):
-        return ""
 
     def is_installed(self):
         return True
