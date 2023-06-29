@@ -1,3 +1,4 @@
+import shutil
 import sys
 import time
 import threading
@@ -67,8 +68,11 @@ class UI(object):
             for _ in range(self._lines_written):
                 sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.write("\r")
+            try:
+                size = os.get_terminal_size()
+            except OSError:
+                size = shutil.get_terminal_size(fallback=(80, 24))
 
-            size = os.get_terminal_size()
             width = size.columns
             height = size.lines
             extra_lines = 0
