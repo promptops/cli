@@ -147,6 +147,12 @@ um_pre_cmd() {{
 
 add-zsh-hook precmd um_pre_cmd
 
+function check_um_workflows() {{
+    echo $fg[green] "Checking for um-compatible workflows"
+    um --scan
+}}
+
+check_um_workflows
 """.strip()
 
     def _get_config_file(self):
