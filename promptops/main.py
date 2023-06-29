@@ -225,6 +225,9 @@ def entry_main():
     # Set the global exception handler
     sys.excepthook = handle_exception(sys.excepthook)
 
+    import warnings
+    warnings.filterwarnings("ignore", module='thefuzz')
+
     import colorama
 
     colorama.init()
