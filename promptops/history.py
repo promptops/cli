@@ -119,7 +119,11 @@ def index_history(show_progress: bool = None, max_history: int = 1000):
 
 def update_history():
     if settings.index_history:
-        index_history()
+        print("indexing history... [ctrl+c] to cancel")
+        try:
+            index_history()
+        except KeyboardInterrupt:
+            pass
 
 
 def add(cmd: str, return_code: int):
