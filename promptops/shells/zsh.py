@@ -30,7 +30,7 @@ def unmetafy(cmd: bytes) -> (bytes, bytes):
 class Zsh(Shell):
     def __init__(self, history_file: str = None):
         if not history_file:
-            history_file = os.getenv("HISTFILE", "~/.zsh_history")
+            history_file = os.getenv("HISTFILE", os.path.join(os.getenv("ZDOTDIR", "~"), ".zsh_history"))
         super().__init__(history_file)
 
     def get_recent_history(self, look_back: int = 10):
@@ -121,4 +121,4 @@ um() {{
 }}""".strip()
 
     def _get_config_file(self):
-        return "~/.zshrc"
+        return os.path.join(os.getenv("ZDOTDIR", "~"), ".zshrc")
