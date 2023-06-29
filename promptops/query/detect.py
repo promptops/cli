@@ -42,6 +42,8 @@ def filter_similar(items):
     existing_hashes = response.json().get("hashes", [])
     unique_items = []
 
+    # sometimes an item that has been saved will be very similar to an item found in this iteration
+    # but we can't really check for that in the has right now
     for i, item in enumerate(items):
         if hash_it(item) in existing_hashes:
             continue

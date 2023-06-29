@@ -560,7 +560,6 @@ def content_to_result(content) -> Result:
 
 
 def check_workflows(*, q: str) -> list[Result]:
-    print("workflows")
     req = {
         "query": q,
         "trace_id": trace.trace_id,
@@ -574,12 +573,10 @@ def check_workflows(*, q: str) -> list[Result]:
         },
     )
     if response.status_code != 200:
-        # this exception completely destroys the ui
+        logging.debug("error searching workflows: %s", json.dumps(response, indent=2))
         return []
-        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
 
     data = response.json().get("results", [])
-    print(len(data))
 
     if len(data) > 2:
         data = data[:2]
