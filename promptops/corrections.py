@@ -68,7 +68,7 @@ def get_correction(prompt: str, command: str, error: str) -> Optional[str]:
         resp.raise_for_status()
     except Exception as e:
         logging.debug(f"error getting correction: {e}, {resp.text}")
-        raise
+        raise e
     # best effort for now
     result = resp.json().get("command", None)
 
