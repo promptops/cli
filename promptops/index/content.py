@@ -31,25 +31,36 @@ def index_content(content: Union[str, bytes], content_type: str) -> VectorDB:
 
     db = VectorDB()
     buffer = b""
+    prev_index = -1
     chunk_size = 1024
     spinner: Optional[ProgressSpinner] = None
     for chunk in response.iter_content(chunk_size=chunk_size):
         buffer += chunk
-        try:
-            decoded = json.loads(buffer)
-            buffer = b""
-        except json.JSONDecodeError:
-            continue
+        while True:
+            try:
+                index = buffer.index(b"}", prev_index + 1)
+            except ValueError:
+                break
+            try:
+                decoded = json.loads(buffer[:index+1])
+                buffer = buffer[index+1:]
+                prev_index = -1
 
-        if spinner is None:
-            spinner = ProgressSpinner(decoded["total"])
-        spinner.set(decoded["done"])
-        for fragment in decoded["fragments"]:
-            fragment: dict = fragment
-            embedding = fragment.pop("embedding")
-            db.add(np.array(embedding), fragment)
+                if spinner is None:
+                    spinner = ProgressSpinner(decoded["total"])
+                spinner.set(decoded["done"])
+                for fragment in decoded["fragments"]:
+                    fragment: dict = fragment
+                    embedding = fragment.pop("embedding")
+                    db.add(np.array(embedding), fragment)
+            except json.JSONDecodeError:
+                prev_index = index
+                continue
     if buffer:
-        logging.warning("remaining buffer: " + repr(buffer))
+        logging.info("failed to index the entire document")
+        logging.debug("remaining buffer: " + repr(buffer))
+    if spinner is not None:
+        spinner.set(spinner.total)
     return db
 
 
