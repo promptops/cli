@@ -11,3 +11,5 @@ index_history: bool = False
 user_index_root = "~/.promptops/index"
 temp_history_file = "~/.promptops/temp_history"
 gen_commit_message = None
+version_check_file = "~/.promptops/version_check"
+show_changes_frequency = 60 * 60 * 24 * 7
