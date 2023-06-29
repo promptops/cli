@@ -148,19 +148,22 @@ def collect_config():
 
 
 def register():
-    print()
-    print("  📢 provide your email address to receive occasional updates and tips (optional, leave blank to skip)")
-    email = confirm("").strip()
-    if email in [GO_BACK, EXIT]:
-        email = ""
-    print()
+    try:
+        print()
+        print("  📢 provide your email address to receive occasional updates and tips (optional, leave blank to skip)")
+        email = confirm("").strip()
+        if email in [GO_BACK, EXIT]:
+            email = ""
+        print()
 
-    requests.post(
-        settings.endpoint + "/installed",
-        json={"trace_id": trace_id, "email": email, "platform": sys.platform, "python_version": sys.version},
-        headers={"user-agent": user_agent()},
-    )
-    config = config_flow()
-    config["trace_id"] = trace_id
-    requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
-    settings_store.save()
+        requests.post(
+            settings.endpoint + "/installed",
+            json={"trace_id": trace_id, "email": email, "platform": sys.platform, "python_version": sys.version},
+            headers={"user-agent": user_agent()},
+        )
+        config = config_flow()
+        config["trace_id"] = trace_id
+        requests.post(settings.endpoint + "/config", json=config, headers={"user-agent": user_agent()})
+        settings_store.save()
+    except KeyboardInterrupt:
+        pass
