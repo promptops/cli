@@ -194,9 +194,11 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         with update_lock:
             nonlocal num_running
             nonlocal ui
+            nonlocal results
             num_running -= 1
             results.extend(extra)
-            options = [pretty_result(r) for r in deduplicate(results)]
+            results = deduplicate(results)
+            options = [pretty_result(r) for r in results]
             if num_running == 0:
                 if len(results) == 0:
                     feedback({"event": "no-results"})
@@ -536,12 +538,11 @@ def curated(*, q: str) -> list[Result]:
         logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
 
     try:
-        message = data.get("message")
+        message = data["message"]
+        return [Result(script=message, lang="text", explanation="-")]
     except KeyError:
-        message = "-"
         logging.debug("no message in response: %s", json.dumps(data, indent=2))
-
-    return [Result(script=message, lang="text", explanation="-")]
+        return []
 
 
 def content_to_result(content) -> Result:
