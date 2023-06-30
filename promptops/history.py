@@ -82,7 +82,7 @@ def index_history(show_progress: bool = None, max_history: int = 1000):
     if max_history > 0:
         prev_commands = prev_commands[-max_history:]
 
-    if show_progress:
+    if progress:
         progress.increment(3)
 
     indexed_commands = {obj if isinstance(obj, str) else obj["cmd"] for obj in db.objects}
@@ -91,35 +91,38 @@ def index_history(show_progress: bool = None, max_history: int = 1000):
 
     if show_progress is None and len(delta) > batch_size:
         from promptops.loading.progress import ProgressSpinner
-        show_progress = True
-        progress = ProgressSpinner(100)
+        progress = ProgressSpinner(100, header="indexing history... [ctrl+c] to cancel")
         progress.increment(4)
-    if show_progress:
+    if progress:
         progress.increment(2)
 
     if len(delta) == 0:
-        if show_progress:
+        if progress:
             progress.set(100)
+        if not show_progress and progress:
+            progress.clear()
         return has_more
 
     start_progress = 6
     for i in range(0, len(delta), batch_size):
         for cmd, vector in embedding_batch(delta[i: i + batch_size]):
             db.add(vector, {"cmd": cmd, "ignore": False})
-        if show_progress:
+        if progress:
             progress.set(start_progress + (i + batch_size) / len(delta) * (100 - start_progress))
 
     db.save(os.path.expanduser(settings.history_db_path))
 
-    if show_progress:
+    if progress:
         progress.set(100)
+
+    if not show_progress and progress:
+        progress.clear()
 
     return has_more
 
 
 def update_history():
     if settings.index_history:
-        print("indexing history... [ctrl+c] to cancel")
         try:
             index_history()
         except KeyboardInterrupt:
