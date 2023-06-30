@@ -615,12 +615,11 @@ def curated(*, q: str) -> list[Result]:
         logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
 
     try:
-        message = data.get("message")
+        message = data["message"]
+        return [Result(script=message, lang="text", explanation="-")]
     except KeyError:
-        message = "-"
         logging.debug("no message in response: %s", json.dumps(data, indent=2))
-
-    return [Result(script=message, lang="text", explanation="-")]
+        return []
 
 
 def content_to_result(content, score) -> Result:
