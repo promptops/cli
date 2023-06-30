@@ -93,6 +93,7 @@ def edit(steps):
 
 def handle_detected_workflow(item):
     print("\nDetected Workflow:")
+    item = list(set(item))
     print_steps(item)
     hashed = hash_it(item)
 
