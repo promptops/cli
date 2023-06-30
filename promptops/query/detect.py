@@ -45,7 +45,9 @@ def filter_similar(items):
     # sometimes an item that has been saved will be very similar to an item found in this iteration
     # but we can't really check for that in the has right now
     for i, item in enumerate(items):
-        if hash_it(item) in existing_hashes:
+        item = list(set(item))
+
+        if hash_it(item) in existing_hashes or len(item) < 2:
             continue
 
         unique = True
@@ -86,7 +88,6 @@ def edit(steps):
 
 def handle_detected_workflow(item):
     print("\nDetected Workflow:")
-    item = list(set(item))
     print_steps(item)
     hashed = hash_it(item)
 
