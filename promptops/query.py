@@ -13,6 +13,7 @@ class Result:
     explanation: str = None
     lang: str = "shell"
     origin: str = "promptops"
+    score: float = 1
 
     @staticmethod
     def from_dict(data: dict) -> 'Result':

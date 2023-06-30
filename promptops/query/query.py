@@ -107,7 +107,7 @@ def make_revise_option():
     return "\x1b[3m💭️ don't see what you're looking for? try providing more context\x1b[0m"
 
 
-ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚", "workflows": "tbd"}
+ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚", "workflows": " 🧰"}
 
 
 def ellipsis_if_needed(text, max_width, more="..."):
@@ -147,8 +147,8 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         for r, score in history_results:
             logging.debug(f"- {score:.2f}: {r}")
     history_results = [
-        Result(script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history", origin="history")
-        for r, _ in history_results
+        Result(score=score, script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history", origin="history")
+        for r, score in history_results
     ]
 
     results = corrected_results + history_results
@@ -433,10 +433,25 @@ def do_query(question: str):
         db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "corrected"})
 
-    feedback({"event": "run"})
     revised_cmd = copy(cmd)
-    revised_cmd.script = confirmed
-    rc, stderr = run(revised_cmd)
+    rc, stderr = 0, ""
+    feedback({"event": "run"})
+
+    if cmd.scripts:
+        print()
+        ui = selections.UI(cmd.scripts + ["exit"], is_loading=False)
+        selection = ui.input()
+        while selection != len(cmd.scripts):
+            revised_cmd = copy(cmd)
+            revised_cmd.script = cmd.scripts[selection]
+            revised_cmd.script = confirmed
+            rc, stderr = run(revised_cmd)
+
+            ui = selections.UI(cmd.scripts + ["exit"], is_loading=False)
+            selection = ui.input()
+    else:
+        revised_cmd.script = confirmed
+        rc, stderr = run(revised_cmd)
     feedback({"event": "finished", "rc": rc})
 
     while rc != 0:
@@ -513,7 +528,7 @@ def query(
         message = "-"
         logging.debug("no message in response: %s", json.dumps(data, indent=2))
 
-    return [Result(script=message, lang="text", explanation="-")]
+    return [Result(script=message, lang="text", explanation="-", score=1)]
 
 
 def curated(*, q: str) -> list[Result]:
@@ -532,13 +547,11 @@ def curated(*, q: str) -> list[Result]:
         },
     )
     if response.status_code != 200:
-        # this exception completely destroys the ui
         return []
-        # raise Exception(f"there was problem with the response, status: {response.status_code}, text: {response.text}")
 
     data = response.json()
     try:
-        return [content_to_result(entry["content"]) for entry in data["items"] if entry["score"] >= 0.75]
+        return [content_to_result(entry["content"], entry["score"]) for entry in data["items"] if entry["score"] >= 0.75]
     except KeyError:
         logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
 
@@ -551,11 +564,12 @@ def curated(*, q: str) -> list[Result]:
     return [Result(script=message, lang="text", explanation="-")]
 
 
-def content_to_result(content) -> Result:
+def content_to_result(content, score) -> Result:
     return Result(
         script=content["content"],
         lang="shell",
         origin="curated",
+        score=score,
     )
 
 
@@ -578,9 +592,6 @@ def check_workflows(*, q: str) -> list[Result]:
 
     data = response.json().get("results", [])
 
-    if len(data) > 2:
-        data = data[:2]
-
     try:
         return [workflow_to_result(wf) for wf in data]
     except KeyError:
@@ -591,8 +602,10 @@ def check_workflows(*, q: str) -> list[Result]:
 
 def workflow_to_result(workflow) -> Result:
     return Result(
-        script=" && ".join(workflow.get("commands", [])).strip(),
+        scripts=workflow.get("commands", []),
+        script=", ".join(workflow.get("commands", [])),
         lang="shell",
         origin="workflows",
-        explanation="Detected workflow for: " + workflow.get("description", "")
+        explanation="Detected workflow for: " + workflow.get("description", ""),
+        score=workflow.get("score")
     )
