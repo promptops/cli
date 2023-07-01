@@ -263,3 +263,22 @@ class UI(object):
     @property
     def is_active(self):
         return self._is_active
+
+    def clear(self):
+        with self._lock:
+            if self._raw_mode:
+                import termios
+                fd = sys.stdin.fileno()
+                termios.tcsetattr(fd, termios.TCSADRAIN, self._old_stdin_attrs)
+
+            # clean all the lines that were written
+            sys.stdout.write("\x1b[2K")
+            for _ in range(self._lines_written):
+                sys.stdout.write("\x1b[1A\x1b[2K")
+            sys.stdout.write("\r")
+            sys.stdout.flush()
+            self._lines_written = 0
+            if self._raw_mode:
+                import tty
+                fd = sys.stdin.fileno()
+                tty.setraw(fd)
