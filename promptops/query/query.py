@@ -280,7 +280,17 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         try:
             update_results(thread.result())
         except Exception as exc:
-            logging.exception(exc)
+            import traceback
+            stack_trace = traceback.format_exc()
+            feedback({"event": "unhandled_exception", "error": stack_trace})
+            with update_lock:
+                nonlocal num_running
+                num_running -= 1
+                if ui.is_active:
+                    ui.clear()
+                print("hit exception:", exc)
+                if ui.is_active:
+                    ui.add_options([], is_loading=num_running > 0)
 
     for task in tasks:
         task.add_done_callback(done_callback)

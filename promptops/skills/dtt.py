@@ -74,8 +74,16 @@ def done_callback(lock, ui: selections.UI, options: list[Choice], counter: Count
                 if ui.is_active:
                     ui.reset_options([option.text for option in options], is_loading=counter.value > 0)
         except Exception as exc:
-            logging.exception(exc)
-
+            import traceback
+            stack_trace = traceback.format_exc()
+            feedback({"event": "unhandled_exception", "error": stack_trace})
+            with lock:
+                counter.value -= 1
+                if ui.is_active:
+                    ui.clear()
+                print("hit exception:", exc)
+                if ui.is_active:
+                    ui.add_options([], is_loading=counter.value > 0)
     return inner
 
 
