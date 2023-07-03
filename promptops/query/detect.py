@@ -42,17 +42,8 @@ def filter_similar(items):
     existing_hashes = response.json().get("hashes", [])
     unique_items = []
 
-<<<<<<< HEAD
-    # sometimes an item that has been saved will be very similar to an item found in this iteration
-    # but we can't really check for that in the has right now
-    for i, item in enumerate(items):
-        item = list(set(item))
-
-        if hash_it(item) in existing_hashes or len(item) < 2:
-=======
     for i, item in enumerate(items):
         if hash_it(item) in existing_hashes:
->>>>>>> 044c398 (workflows: slightly modify ux flow for saving recipes)
             continue
 
         unique = True

@@ -65,10 +65,6 @@ def query_mode(args):
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
 
-    if args.scan:
-        from promptops.query.detect import detect_workflows
-        detect_workflows()
-
     last_command_result = os.environ.get("PROMPTOPS_LAST_COMMAND_RESULT")
     last_command = os.environ.get("PROMPTOPS_LAST_COMMAND")
 

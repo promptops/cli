@@ -32,8 +32,10 @@ def similarity(cmd1, cmd2):
 
 
 class SuffixTree:
-    def __init__(self):
+    def __init__(self, max_depth=3, history_count=1000):
         self.roots = {}
+        self.max_depth = max_depth
+        self.history_count = history_count
         self.build_tree()
 
     def insert(self, command_sequence):
@@ -48,11 +50,11 @@ class SuffixTree:
         node['$'] = node.get('$', 0) + 1
 
     def build_tree(self):
-        lines = shells.get_shell().get_recent_history(1000)
+        lines = shells.get_shell().get_recent_history(self.history_count)
         for i, line in enumerate(lines):
             root_cmd = line
             if root_cmd:
-                self.insert(lines[i:i+3])
+                self.insert(lines[i:i+self.max_depth])
 
     def close_enough_node(self, text, cutoff=0.7):
         def count_dicts(d):
@@ -127,6 +129,21 @@ class SuffixTree:
         next_cmds.sort(key=lambda x: x[1], reverse=True)
 
         return [cmd for cmd, freq in next_cmds]
+
+    def find_repeated_sequences(self, min_repeats=2):
+        def _traverse(node, sequence):
+            if node.get('$', 0) >= min_repeats:
+                yield sequence
+            for string, child_node in node.items():
+                if string != '$':
+                    add_to_seq = [string] if string != 'next' else []
+                    yield from _traverse(child_node, sequence + add_to_seq)
+
+        repeated_sequences = []
+        for root_string, root_node in self.roots.items():
+            repeated_sequences.extend(_traverse(root_node, [root_string]))
+
+        return repeated_sequences
 
 
 suffix_tree = None
