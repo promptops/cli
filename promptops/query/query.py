@@ -7,7 +7,7 @@ from copy import copy
 import subprocess
 import threading
 import random
-from typing import Optional
+from typing import Optional, List, Tuple
 
 import colorama
 import requests
@@ -87,7 +87,8 @@ def run(cmd: Result) -> (int, Optional[str]):
 def corrections_search(embedding):
     db = corrections.get_db()
     similar = db.search(embedding, k=3, min_similarity=0.8)
-    return list(filter(lambda c: c[0].corrected is not None, [(corrections.QATuple.from_dict(s), score) for s, score in similar]))
+    return list(filter(lambda c: c[0].corrected is not None,
+                       [(corrections.QATuple.from_dict(s), score) for s, score in similar]))
 
 
 def search_indexed_fragments(embedding, current_dir: str) -> list[index_store.SearchResult]:
@@ -107,6 +108,10 @@ def make_revise_option():
     return "\x1b[3m💭️ don't see what you're looking for? try providing more context\x1b[0m"
 
 
+def make_show_all_option():
+    return "\x1b[3m💭️ see all results \x1b[0m"
+
+
 ORIGIN_SYMBOLS = {"history": "📖", "promptops": "✨", "curated": "📚", "workflows": " 🧰"}
 
 
@@ -117,8 +122,27 @@ def ellipsis_if_needed(text, max_width, more="..."):
 
 
 def pretty_result(result: Result):
-    text = result.script if result.lang != "text" else colorama.Fore.YELLOW + ellipsis_if_needed(result.script, 120, "...") + colorama.Style.RESET_ALL
+    text = result.script if result.lang != "text" else colorama.Fore.YELLOW + ellipsis_if_needed(result.script, 120,
+                                                                                                 "...") + colorama.Style.RESET_ALL
     return (ORIGIN_SYMBOLS.get(result.origin, f"[{result.origin[0]}]") + " " if result.origin else "") + text
+
+
+def sort_results(results: List[Result]):
+    return sorted(results, key=lambda x: x.score)
+
+
+def set_results(primary, secondary, results) -> Tuple[List[Result], List[Result]]:
+
+    if not results or len(results) == 0:
+        return primary, secondary
+
+    results = sort_results(results)
+
+    primary.append(results.pop(0))
+    secondary.extend(results)
+
+    # we don't sort primary to not have the ui jump around
+    return primary, sort_results(secondary)
 
 
 @dataclass
@@ -127,6 +151,9 @@ class ConfirmResult:
     confirmed: str = ""
     question: str = None
     options: list = None
+
+
+MINIMUM_DESIRED_RESULTS = 1
 
 
 def revise_loop(questions: list[str], prev_results: list[list[str]], history_context: list[str]) -> ConfirmResult:
@@ -147,11 +174,14 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         for r, score in history_results:
             logging.debug(f"- {score:.2f}: {r}")
     history_results = [
-        Result(score=score, script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history", origin="history")
+        Result(score=score, script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history",
+               origin="history")
         for r, score in history_results
     ]
 
-    results = corrected_results + history_results
+    history_results = sort_results(history_results)
+    results = corrected_results + [history_results.pop(0)] if len(history_results) > 0 else []
+    secondary = history_results[1:]
     results = deduplicate(results)
 
     relevant_indexed_data = search_indexed_fragments(embedding, os.getcwd())
@@ -196,14 +226,30 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         )
     ]
     num_running = len(tasks)
+    show_all = False
+
+    def add_trailing_option(options):
+        nonlocal num_running, secondary, show_all
+        if num_running > 0:
+            return options
+        if show_all or len(secondary) == 0:
+            show_all = show_all or len(secondary) == 0
+            return options + [make_revise_option()]
+        else:
+            return options + [make_show_all_option()]
 
     def update_results(extra):
         with update_lock:
-            nonlocal num_running
-            nonlocal ui
+            nonlocal num_running, results, secondary, ui, show_all
             num_running -= 1
-            results.extend(extra)
+
+            results, secondary = set_results(results, secondary, extra)
+            if show_all:
+                results.extend(secondary)
+                secondary = []
+
             options = [pretty_result(r) for r in deduplicate(results)]
+            options = add_trailing_option(options)
             if num_running == 0:
                 if len(results) == 0:
                     feedback({"event": "no-results"})
@@ -212,7 +258,11 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
                     if selected == prompts.EXIT:
                         raise KeyboardInterrupt()
                     return ConfirmResult(question=selected, options=[])
-                options += [make_revise_option()]
+                else:
+                    if len(results) < 2:
+                        size = len(results)
+                        results += secondary[:(MINIMUM_DESIRED_RESULTS - size)]
+                        secondary = secondary[(MINIMUM_DESIRED_RESULTS - size):]
             if ui:
                 ui.reset_options(options, is_loading=num_running > 0)
             else:
@@ -244,8 +294,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
             if result.origin == "history":
                 results.pop(ui.selected)
                 options = [pretty_result(r) for r in results]
-                if num_running == 0:
-                    options += [make_revise_option()]
+                options = add_trailing_option(options)
                 ui.reset_options(options, is_loading=num_running > 0)
         hdb = history.get_history_db()
         for item in hdb.objects:
@@ -256,8 +305,8 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
     while True:
         with update_lock:
             options = [pretty_result(r) for r in results]
-            if num_running == 0:
-                options += [make_revise_option()]
+            options = add_trailing_option(options)
+
             if ui:
                 ui.reset_options(options, is_loading=num_running > 0)
             else:
@@ -273,12 +322,17 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         index = ui.input()
         print()
         if index == len(results):
-            selected = prompts.confirm_clarify("")
-            if selected == prompts.GO_BACK:
-                continue
-            elif selected == prompts.EXIT:
-                raise KeyboardInterrupt()
-            return ConfirmResult(question=selected, options=[r.script for r in results if r.origin == "promptops"])
+            if show_all:
+                selected = prompts.confirm_clarify("")
+                if selected == prompts.GO_BACK:
+                    continue
+                elif selected == prompts.EXIT:
+                    raise KeyboardInterrupt()
+                return ConfirmResult(question=selected, options=[r.script for r in results if r.origin == "promptops"])
+            else:
+                show_all = True
+                results = deduplicate(results + secondary)
+                ui = selections.UI(options, is_loading=num_running > 0, loading_text=random.choice(messages.QUERY))
         else:
             selected = results[index]
             if selected.lang == "text":
@@ -403,7 +457,8 @@ def do_query(question: str):
     print()
 
     def input_loop():
-        history_context = shells.get_shell().get_recent_history(settings.history_context) if settings.history_context else []
+        history_context = shells.get_shell().get_recent_history(
+            settings.history_context) if settings.history_context else []
         while True:
             results = revise_loop(questions, prev_results, history_context)
             if results.result:
@@ -428,7 +483,8 @@ def do_query(question: str):
         db = corrections.get_db()
         q = "\n".join(questions)
         vector = similarity.embedding(text=q)
-        db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=confirmed).to_dict(), equals=lambda a, b: a["question"] == b["question"])
+        db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=confirmed).to_dict(),
+                         equals=lambda a, b: a["question"] == b["question"])
         logging.debug("added correction to db")
         db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "corrected"})
@@ -464,21 +520,23 @@ def do_query(question: str):
             db = corrections.get_db()
             q = "\n".join(questions)
             vector = similarity.embedding(text=q)
-            db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script, corrected=corrected_cmd.script).to_dict(), equals=lambda a, b: a["question"] == b["question"])
+            db.update_or_add(vector, corrections.QATuple(question=q, answer=cmd.script,
+                                                         corrected=corrected_cmd.script).to_dict(),
+                             equals=lambda a, b: a["question"] == b["question"])
             logging.debug("added correction to db")
             db.save(os.path.expanduser(settings.corrections_db_path))
         feedback({"event": "finished", "rc": rc, "corrected": True})
 
 
 def query(
-    *,
-    q: str,
-    prev_questions: list[str],
-    prev_results: list[list[str]],
-    corrected_results: list[corrections.QATuple],
-    history_context: list[str],
-    similar_history: list[str],
-    relevant_indexed_data: list[index_store.SearchResult],
+        *,
+        q: str,
+        prev_questions: list[str],
+        prev_results: list[list[str]],
+        corrected_results: list[corrections.QATuple],
+        history_context: list[str],
+        similar_history: list[str],
+        relevant_indexed_data: list[index_store.SearchResult],
 ) -> list[Result]:
     req = {
         "query": q,
@@ -551,7 +609,8 @@ def curated(*, q: str) -> list[Result]:
 
     data = response.json()
     try:
-        return [content_to_result(entry["content"], entry["score"]) for entry in data["items"] if entry["score"] >= 0.75]
+        return [content_to_result(entry["content"], entry["score"]) for entry in data["items"] if
+                entry["score"] >= 0.75]
     except KeyError:
         logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
 

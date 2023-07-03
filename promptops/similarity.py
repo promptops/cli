@@ -21,7 +21,7 @@ class VectorDB(object):
             self.vectors = np.vstack((self.vectors, vector))
         self.objects.append(obj)
 
-    def update_or_add(self, vector, obj, equals: callable=None):
+    def update_or_add(self, vector, obj, equals: callable = None):
         if equals is None:
             equals = lambda a, b: a == b
         for i, o in enumerate(self.objects):
@@ -31,12 +31,14 @@ class VectorDB(object):
         self.add(vector, obj)
 
     def search(self, vector, k=1, min_similarity=0.8):
-        # compute cosine similarity
         if len(self.vectors) == 0:
             return []
-        scores = np.dot(vector, self.vectors.T).flatten()
-        # rank results
+
+        norms = np.linalg.norm(self.vectors, axis=1) * np.linalg.norm(vector)
+        scores = np.dot(self.vectors, vector) / norms
+
         results = np.argsort(scores)[::-1]
+
         return [(self.objects[i], scores[i]) for i in results[:k] if scores[i] > min_similarity]
 
     def argsearch(self, vector, k=1, min_similarity=0.8):
