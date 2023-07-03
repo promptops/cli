@@ -128,6 +128,7 @@ def pretty_result(result: Result):
 
 
 def sort_results(results: List[Result]):
+    results = list(filter(lambda c: c is not None, results))
     return sorted(results, key=lambda x: x.score)
 
 
