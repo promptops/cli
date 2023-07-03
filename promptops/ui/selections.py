@@ -193,7 +193,7 @@ class UI(object):
     @staticmethod
     def _get_formatted_text(option: str, selected: bool):
         opt = "\n".join(
-                [(colorama.Fore.LIGHTYELLOW_EX if re.match("^. *#.*$", line) else colorama.Fore.LIGHTWHITE_EX) + line
+                [(colorama.Fore.LIGHTYELLOW_EX if re.match("^(. *)?#.*$", line) else colorama.Fore.LIGHTWHITE_EX) + line
                  for line in option.split("\n")]
         )
         return f"{colorama.Style.BRIGHT if selected else ''}{opt}{colorama.Style.RESET_ALL}".replace("\n", "\n      ")
