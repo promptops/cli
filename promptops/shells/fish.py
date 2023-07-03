@@ -1,4 +1,3 @@
-import subprocess
 import time
 
 from .base import Shell
@@ -67,4 +66,3 @@ end
 
     def _get_config_file(self):
         return "~/.config/fish/config.fish"
-

@@ -316,7 +316,6 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         with update_lock:
             options = [pretty_result(r) for r in results]
             options = add_trailing_option(options)
-
             if ui:
                 ui.reset_options(options, is_loading=num_running > 0)
             else:
