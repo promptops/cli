@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import queue
 import sys
 from dataclasses import dataclass
 from copy import copy
@@ -40,6 +41,8 @@ def deduplicate(results: list[Result]):
     results_set = set()
     final_results = []
     for result in results:
+        if not result.script:
+            continue
         if result.script in results_set:
             continue
         results_set.add(result.script)
@@ -189,6 +192,7 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         )
     ]
     num_running = len(tasks)
+    task_signal_queue = queue.Queue()
 
     def update_results(extra):
         with update_lock:
@@ -196,18 +200,17 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
             nonlocal ui
             nonlocal results
             num_running -= 1
-            results.extend(extra)
-            results = deduplicate(results)
-            options = [pretty_result(r) for r in results]
+            options = []
+            task_signal_queue.put(True)
+            additions = deduplicate(extra)
+            if len(additions) > 0:
+                results.extend(additions)
+                results = deduplicate(results)
+                options.extend([pretty_result(r) for r in results])
             if num_running == 0:
-                if len(results) == 0:
-                    feedback({"event": "no-results"})
-                    print("couldn't find any results, try rephrasing your question or providing more context")
-                    selected = prompts.confirm_clarify("")
-                    if selected == prompts.EXIT:
-                        raise KeyboardInterrupt()
-                    return ConfirmResult(question=selected, options=[])
-                options += [make_revise_option()]
+                options.append(make_revise_option())
+            elif len(additions) == 0:
+                return
             if ui:
                 ui.reset_options(options, is_loading=num_running > 0)
             else:
@@ -258,10 +261,24 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
                 item["ignore"] = True
         hdb.save(os.path.expanduser(settings.history_db_path))
 
+    # wait for threads to finish one by one until we get the first non-empty result
+    with loading_animation(Simple("thinking...")):
+        while num_running > 0:
+            task_signal_queue.get()
+            if len(results) > 0:
+                break
+
     while True:
         with update_lock:
             options = [pretty_result(r) for r in results]
             if num_running == 0:
+                if len(results) == 0:
+                    feedback({"event": "no-results"})
+                    print("couldn't find any results, try rephrasing your question or providing more context")
+                    selected = prompts.confirm_clarify("")
+                    if selected == prompts.EXIT:
+                        raise KeyboardInterrupt()
+                    return ConfirmResult(question=selected, options=[])
                 options += [make_revise_option()]
             if ui:
                 ui.reset_options(options, is_loading=num_running > 0)
