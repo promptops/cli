@@ -59,7 +59,11 @@ def query_mode(args):
     settings.history_context = args.history_context
     settings.request_explanation = args.explain
 
+    last_command_result = os.environ.get("PROMPTOPS_LAST_COMMAND_RESULT")
+    last_command = os.environ.get("PROMPTOPS_LAST_COMMAND")
     question = " ".join(args.question)
+    if not question.strip() and last_command_result != "0" and last_command:
+        question = last_command
     try:
         if question.strip():
             feedback({"event": "query_mode"})
