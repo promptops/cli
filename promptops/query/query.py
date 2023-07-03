@@ -174,7 +174,8 @@ def revise_loop(questions: list[str], prev_results: list[list[str]], history_con
         for r, score in history_results:
             logging.debug(f"- {score:.2f}: {r}")
     history_results = [
-        Result(score=score, script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history", origin="history")
+        Result(score=score, script=r if isinstance(r, str) else r["cmd"], explanation="loaded from shell history",
+               origin="history")
         for r, score in history_results
     ]
 
@@ -618,7 +619,8 @@ def curated(*, q: str) -> list[Result]:
 
     data = response.json()
     try:
-        return [content_to_result(entry["content"], entry["score"]) for entry in data["items"] if entry["score"] >= 0.75]
+        return [content_to_result(entry["content"], entry["score"]) for entry in data["items"] if
+                entry["score"] >= 0.75]
     except KeyError:
         logging.debug("no suggestions in response: %s", json.dumps(data, indent=2))
 
