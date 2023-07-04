@@ -1,3 +1,16 @@
+# v0.1.11 (7/3/2023)
+
+- `um` can detect if command fails and offer to fix it
+- bug fixes
+
+# v0.1.10 (6/23/2023)
+
+- parameterless `um`: suggests next actions based on usage patterns
+  - recommends commands based on historical patterns in your shell history
+  - git-related operations considering the current state of the git repository
+  - generates commit messages for the staged changes
+- improved command lookup with expert-curated cheat sheets
+
 # v0.1.7 (6/15/2023)
 
 - extended reverse search functionality with fuzzy matching and semantic search

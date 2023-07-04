@@ -8,8 +8,9 @@
 - `um` can index your history to find commands you've run before
 - `um` instantly learns from your corrections
 - simple interface to clarify your question or provide more context
-- NEW in 0.1.6: `um workflow` helps you provision infrastructure (currently terraform only, more coming soon)
+- NEW in 0.1.6: `um recipe` helps you provision infrastructure (currently terraform only, more coming soon)
 - NEW in 0.1.7: extended reverse search functionality with fuzzy matching and semantic search
+- NEW in 0.1.10: parameterless `um`: suggests next actions based on usage patterns
 
 # Installation
 
@@ -65,12 +66,24 @@ Remove the eval line from your `.zshrc` file and reload.
 
 ## um
 
+Suggest next actions based on usage patterns
+```shell
+um
+```
+
+Query for command
 ```shell
 um <question>
 ```
 
+Create or reuse templates to provision infrastructure (currently terraform only, more coming soon)
 ```shell
 um recipe <multi-stepped-prompt>
+```
+
+Add file or website to the index
+```shell
+um index --source <file-or-url>
 ```
 
 ## local runner
@@ -86,7 +99,7 @@ um list contents of tar file
 um upload file to s3
 ```
 
-## More screenshots
+## Screenshots
 
 Semantic search in history
 
@@ -95,6 +108,10 @@ Semantic search in history
 Provide more context flow
 
 <img src="https://github.com/promptops/cli/raw/main/media/clarify.png" />
+
+Index website
+
+<img src="https://github.com/promptops/cli/raw/main/media/index.png" />
 
 # Development setup
 
