@@ -71,7 +71,7 @@ def index_file(path: str) -> (ItemMetadata, VectorDB):
     with open(path, "r") as f:
         lines = f.readlines()
         lines = scrub_file(path, lines)
-        db = index_content("".join(lines), mimetype)
+        db = index_content("".join(lines).encode("utf-8"), mimetype)
     path = os.path.abspath(path)
     return ItemMetadata(
         item_type="file",
