@@ -17,20 +17,20 @@ spec:
       serviceAccountName: promptops-runner
       containers:
         - name: main
-          image: 574904823953.dkr.ecr.us-west-2.amazonaws.com/promptops-private:latest
+          image: public.ecr.aws/ctrlstack/promtops-runner:latest
           volumeMounts:
             - mountPath: /root/.promptops
               name: promptops-vol
             # include if setting AWS credentials
-            - name: aws-configuration
-              mountPath: /root/.aws
-              readOnly: true
+#            - name: aws-configuration
+#              mountPath: /root/.aws
+#              readOnly: true
 
-      volumes:
-        -  # include if setting AWS credentials
-        - name: aws-configuration
-          secret:
-            secretName: aws-configuration
+#      volumes:
+#        -  # include if setting AWS credentials
+#        - name: aws-configuration
+#          secret:
+#            secretName: aws-configuration
 
   volumeClaimTemplates:
     - metadata:

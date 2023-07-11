@@ -102,6 +102,23 @@ subjects:
     name: promptops-runner
     namespace: promptops
 ---
+# example AWS secret for the k8s based local-runner
+# this secret can also be created using the k8s secrets manager, vault, etc.\
+# note that the values in data should be base64 encoded (e.g. cat ~/.aws/config | base64)
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  name: aws-configuration
+#  namespace: promptops
+#data:
+#  credentials: |-
+#    [default]
+#    aws_access_key_id=SOMETHING
+#    aws_secret_access_key=SOMETHING
+#  config: |-
+#    [default]
+#    region=us-west-2
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -121,20 +138,20 @@ spec:
       serviceAccountName: promptops-runner
       containers:
         - name: main
-          image: 574904823953.dkr.ecr.us-west-2.amazonaws.com/promptops-private:latest
+          image: public.ecr.aws/ctrlstack/promtops-runner:latest
           volumeMounts:
             - mountPath: /root/.promptops
               name: promptops-vol
             # include if setting AWS credentials
-            - name: aws-configuration
-              mountPath: /root/.aws
-              readOnly: true
+#            - name: aws-configuration
+#              mountPath: /root/.aws
+#              readOnly: true
 
-      volumes:
-        -  # include if setting AWS credentials
-        - name: aws-configuration
-          secret:
-            secretName: aws-configuration
+#      volumes:
+#        -  # include if setting AWS credentials
+#        - name: aws-configuration
+#          secret:
+#            secretName: aws-configuration
 
   volumeClaimTemplates:
     - metadata:
