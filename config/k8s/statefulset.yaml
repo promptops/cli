@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: promptops-runner
+  namespace: promptops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: promptops-runner
+  serviceName: promptops-runner
+  template:
+    metadata:
+      labels:
+        app: promptops-runner
+    spec:
+      serviceAccountName: promptops-runner
+      containers:
+        - name: main
+          image: 574904823953.dkr.ecr.us-west-2.amazonaws.com/promptops-private:latest
+          volumeMounts:
+            - mountPath: /root/.promptops
+              name: promptops-vol
+            # include if setting AWS credentials
+            - name: aws-configuration
+              mountPath: /root/.aws
+              readOnly: true
+
+      volumes:
+        -  # include if setting AWS credentials
+        - name: aws-configuration
+          secret:
+            secretName: aws-configuration
+
+  volumeClaimTemplates:
+    - metadata:
+        name: promptops-vol
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Mi

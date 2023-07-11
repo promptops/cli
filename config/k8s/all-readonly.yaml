@@ -1,0 +1,141 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: promptops
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  creationTimestamp: null
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: promptops-runner
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - nodes
+      - nodes/proxy
+      - nodes/stats
+      - pods
+      - replicationcontrollers
+      - services
+      - configmaps
+      - serviceaccounts
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - statefulsets
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+
+  - apiGroups: ["coordination.k8s.io"]
+    resources:
+      - leases
+    verbs:
+      - get
+      - create
+      - update
+      - delete
+
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+      - list
+
+  - nonResourceURLs: ["/metrics"]
+    verbs:
+      - get
+
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
+
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promptops-runner
+  namespace: promptops
+# if running on eks, you can bind a role like this
+#  annotations:
+#    eks.amazonaws.com/role-arn: arn:aws:iam::account-id:role/role-name
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: promptops-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promptops-runner
+subjects:
+  - kind: ServiceAccount
+    name: promptops-runner
+    namespace: promptops
+---
+aws.yaml
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: promptops-runner
+  namespace: promptops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: promptops-runner
+  serviceName: promptops-runner
+  template:
+    metadata:
+      labels:
+        app: promptops-runner
+    spec:
+      serviceAccountName: promptops-runner
+      containers:
+        - name: main
+          image: 574904823953.dkr.ecr.us-west-2.amazonaws.com/promptops-private:latest
+          volumeMounts:
+            - mountPath: /root/.promptops
+              name: promptops-vol
+            # include if setting AWS credentials
+            - name: aws-configuration
+              mountPath: /root/.aws
+              readOnly: true
+
+      volumes:
+        -  # include if setting AWS credentials
+        - name: aws-configuration
+          secret:
+            secretName: aws-configuration
+
+  volumeClaimTemplates:
+    - metadata:
+        name: promptops-vol
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Mi
