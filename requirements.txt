@@ -12,6 +12,7 @@ wcwidth~=0.2.6
 # extras for the local runner
 boto3~=1.26.159
 kubernetes~=26.1.0
+requests_aws4auth~=1.1.0
 
 # test dependencies
 pytest~=7.4.0
